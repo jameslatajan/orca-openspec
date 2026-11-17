@@ -66,6 +66,7 @@ The plugin SHALL offer New change, Apply, Verify and Archive as palette commands
 - **Action bar:** selecting a change SHALL show an action bar with Apply and Verify. When the selected change is Ready to archive, Archive SHALL replace Verify.
 - **Launching:** each action SHALL start an agent in the focused workspace and bring its terminal into view. It SHALL then wait until the terminal is ready for input, polling every 500 ms for up to 30 s, and type the prompt followed by Enter. If readiness is not detected in time, it SHALL send the prompt anyway and log that it timed out.
 - **Agent:** the form's agent is used for Explore and Propose. Other actions SHALL use the `agent` setting (default `claude`).
+- **Model:** when the form's agent is `claude`, the form SHALL show a Model picker (Default, Opus, Sonnet, Haiku) that remembers the last choice. For Explore and Propose with a model other than Default, the plugin SHALL type `/model <model>` once the agent is ready, wait until it is ready again, then type the OpenSpec command. Default, other agents, and Apply/Verify/Archive SHALL send no `/model` command.
 - **Prompt format** follows the `commandStyle` setting:
   - `skill` (default): `/openspec-explore <description>`, `/openspec-propose <description>`, `/openspec-apply-change <change>`, `/openspec-verify-change <change>` or `/openspec-archive-change <change>`;
   - `opsx`: `/opsx:explore`, `/opsx:propose`, `/opsx:apply`, `/opsx:verify` or `/opsx:archive`, followed by the description or change.
@@ -109,6 +110,14 @@ The plugin SHALL offer New change, Apply, Verify and Archive as palette commands
 #### Scenario: Palette command with several changes
 - **WHEN** the user runs the palette command "OpenSpec: Apply change" and more than one change is active
 - **THEN** the change selected in the panel is used, or a notification asks the user to select one in the panel
+
+#### Scenario: Pick a Claude model
+- **WHEN** the user picks agent `claude`, model Sonnet, types "add dark mode" and presses Explore
+- **THEN** the agent receives `/model sonnet`, and after it is ready again, `/openspec-explore add dark mode`
+
+#### Scenario: No model for other agents
+- **WHEN** the selected agent is `codex`
+- **THEN** the form shows no Model picker and no `/model` command is sent
 
 ### Requirement: Empty and error states
 The panel SHALL show an empty state with an Init OpenSpec action when the workspace has no `openspec/` folder, a "no workspace" state when none is focused, and an inline error when reading fails.
