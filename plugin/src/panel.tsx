@@ -155,19 +155,38 @@ function SystemBar(props: { prefixes: string[] }) {
   ]
   return (
     <Stack gap="xs">
-      <Toolbar label="Store scope" gap="xs">
-        {modes.map((m) => (
-          <Button
-            key={m.value}
-            size="sm"
-            variant={m.value === mode ? 'solid' : 'outline'}
-            tone={m.value === mode ? 'accent' : 'neutral'}
-            onPress={() => set(systemMode, m.value)}
-          >
-            {m.label}
-          </Button>
-        ))}
-      </Toolbar>
+      <Row gap="xs">
+        <Toolbar label="Store scope" gap="xs">
+          {modes.map((m) => (
+            <Button
+              key={m.value}
+              size="xs"
+              variant={m.value === mode ? 'solid' : 'outline'}
+              tone={m.value === mode ? 'accent' : 'neutral'}
+              onPress={() => set(systemMode, m.value)}
+            >
+              {m.label}
+            </Button>
+          ))}
+        </Toolbar>
+        {mode === 'system' && !editing ? (
+          <Row gap="none">
+            <Text muted size="xs">
+              {props.prefixes.length ? props.prefixes.join(', ') : 'system not set'}
+            </Text>
+            <IconButton
+              icon="edit"
+              label="Edit system"
+              size="xs"
+              variant="ghost"
+              onPress={() => {
+                set(systemDraft, props.prefixes.join(', '))
+                set(editingSystem, true)
+              }}
+            />
+          </Row>
+        ) : null}
+      </Row>
       {editing ? (
         <Row gap="xs">
           <Input
@@ -177,28 +196,11 @@ function SystemBar(props: { prefixes: string[] }) {
             value={read(systemDraft)}
             onChange={(v) => set(systemDraft, v)}
           />
-          <Button size="sm" variant="solid" onPress={saveSystem}>
+          <Button size="xs" variant="solid" onPress={saveSystem}>
             Save
           </Button>
-          <Button size="sm" variant="ghost" onPress={() => set(editingSystem, false)}>
+          <Button size="xs" variant="ghost" onPress={() => set(editingSystem, false)}>
             Cancel
-          </Button>
-        </Row>
-      ) : mode === 'system' ? (
-        <Row gap="xs">
-          <Text muted size="xs">
-            System: {props.prefixes.length ? props.prefixes.join(', ') : 'not set'}
-          </Text>
-          <Button
-            size="sm"
-            variant="ghost"
-            icon="edit"
-            onPress={() => {
-              set(systemDraft, props.prefixes.join(', '))
-              set(editingSystem, true)
-            }}
-          >
-            Edit system
           </Button>
         </Row>
       ) : null}
@@ -410,7 +412,7 @@ function Header(props: { title: string; canCreate: boolean; store?: string }) {
   return (
     <Row justify="between">
       <Row gap="xs">
-        <Heading>{props.title}</Heading>
+        <Heading level={3}>{props.title}</Heading>
         {props.store ? <Badge tone="accent">via store {props.store}</Badge> : null}
       </Row>
       <Row gap="xs">
@@ -418,6 +420,7 @@ function Header(props: { title: string; canCreate: boolean; store?: string }) {
           <IconButton
             icon={read(formOpen) ? 'close' : 'add'}
             label={read(formOpen) ? 'Close new change' : 'New change'}
+            size="sm"
             variant="solid"
             tone="accent"
             onPress={() => (read(formOpen) ? closeForm() : openForm())}
@@ -426,7 +429,7 @@ function Header(props: { title: string; canCreate: boolean; store?: string }) {
         {read(refreshing) ? (
           <Spinner label="Refreshing" labelHidden />
         ) : (
-          <IconButton icon="refresh" label="Refresh" variant="ghost" onPress={reload} />
+          <IconButton icon="refresh" label="Refresh" size="sm" variant="ghost" onPress={reload} />
         )}
       </Row>
     </Row>
@@ -470,7 +473,7 @@ function ChangesTab(props: { changes: ChangeInfo[]; shared?: ChangeInfo[] }) {
         {CHIPS.map((c) => (
           <Button
             key={c.value}
-            size="sm"
+            size="xs"
             variant={c.value === active ? 'solid' : 'outline'}
             tone={c.value === active ? 'accent' : 'neutral'}
             onPress={() => set(chip, c.value)}
@@ -581,21 +584,21 @@ export default function Panel() {
     return <EmptyState title="No workspace" description="Focus a workspace to see its OpenSpec changes." />
   if (s.status === 'remote')
     return (
-      <Stack gap="md">
+      <Stack gap="sm">
         <Header title={title} canCreate={false} store={s.store} />
         <EmptyState title="Remote workspace" description="Remote workspaces are not supported yet." />
       </Stack>
     )
   if (s.status === 'error')
     return (
-      <Stack gap="md">
+      <Stack gap="sm">
         <Header title={title} canCreate={false} store={s.store} />
         <Callout tone="danger">Could not read OpenSpec: {s.error}</Callout>
       </Stack>
     )
   if (s.status === 'no-openspec')
     return (
-      <Stack gap="md">
+      <Stack gap="sm">
         <Header title={title} canCreate={false} store={s.store} />
         <EmptyState title="OpenSpec is not set up" description="This workspace has no openspec/ folder.">
           <Button onPress={init}>Init OpenSpec</Button>
@@ -610,7 +613,7 @@ export default function Panel() {
   const changeCount = filtered ? filtered.changes.mine.length + filtered.changes.shared.length : s.changes.length
   const specCount = filtered ? filtered.specs.mine.length + filtered.specs.shared.length : s.specs.length
   return (
-    <Stack gap="md">
+    <Stack gap="sm">
       <Header title={title} canCreate store={s.store} />
       <UpdatedLine />
       {view ? <SystemBar prefixes={view.prefixes} /> : null}
