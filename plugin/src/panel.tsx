@@ -72,9 +72,41 @@ const prefixesFor = atom<string | null>(null)
 const editingSystem = atom(false)
 const systemDraft = atom('')
 
+/** Registered stores for the "not set up" screen: null while loading, [] when none. */
+const storeOptions = atom<string[] | null>(null)
+const storePick = atom<string | null>(null)
+const linking = atom(false)
+
+async function loadStores(): Promise<void> {
+  try {
+    const { stores } = await plugin.request('openspec.stores')
+    const ids = stores.map((s) => s.id)
+    set(storeOptions, ids)
+    if (!read(storePick) || !ids.includes(read(storePick) as string)) set(storePick, ids[0] ?? null)
+  } catch (err) {
+    set(storeOptions, [])
+    set(actionError, err instanceof Error ? err.message : String(err))
+  }
+}
+
+async function linkStore(): Promise<void> {
+  const id = read(storePick)
+  if (!id || read(linking)) return
+  set(linking, true)
+  set(actionError, null)
+  try {
+    receive(await plugin.request('openspec.linkStore', { store: id }))
+  } catch (err) {
+    set(actionError, err instanceof Error ? err.message : String(err))
+  } finally {
+    set(linking, false)
+  }
+}
+
 function receive(next: OpenSpecState): void {
   set(state, next)
   set(updatedAt, Date.now())
+  if (next.status === 'no-openspec' && !next.store) void loadStores()
   const key = next.store ? `${next.workspace ?? ''}@${next.store}` : null
   if (key && key !== read(prefixesFor)) void loadPrefixes(key)
   if (!key) set(prefixesFor, null)
@@ -332,6 +364,39 @@ export function setup(ctx: PanelContext): void {
   void load()
 }
 
+function LinkStore() {
+  const stores = read(storeOptions)
+  if (stores === null) return <Spinner label="Loading stores" />
+  if (stores.length === 0)
+    return (
+      <Text muted size="xs">
+        No OpenSpec stores are registered on this machine. Register one with `openspec store register &lt;path&gt;`,
+        then press Refresh.
+      </Text>
+    )
+  const busy = read(linking)
+  return (
+    <Box direction="column" gap="sm" padding="sm">
+      <Text>Or use a store</Text>
+      <Select
+        label="Store"
+        value={read(storePick) ?? stores[0]}
+        options={stores.map((id) => ({ value: id, label: id }))}
+        disabled={busy}
+        onChange={(v) => set(storePick, v)}
+      />
+      <Stack gap="xs" align="stretch">
+        <Button variant="solid" tone="accent" icon="link" disabled={busy} onPress={linkStore}>
+          Link store
+        </Button>
+      </Stack>
+      <Text muted size="xs">
+        Creates openspec/config.yaml with only a store: line. Nothing else in the project changes.
+      </Text>
+    </Box>
+  )
+}
+
 function UpdatedLine() {
   const at = read(updatedAt)
   return at === null ? null : (
@@ -535,6 +600,7 @@ export default function Panel() {
         <EmptyState title="OpenSpec is not set up" description="This workspace has no openspec/ folder.">
           <Button onPress={init}>Init OpenSpec</Button>
         </EmptyState>
+        {s.store ? null : <LinkStore />}
         {errorBox}
       </Stack>
     )

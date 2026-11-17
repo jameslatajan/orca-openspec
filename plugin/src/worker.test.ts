@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { assert, mockHost, mountWorker, test } from 'orca/testing'
@@ -109,6 +109,41 @@ test('posts fresh state once when a task is ticked on disk', async () => {
   assert.deepEqual(state.changes[0], { name: 'add-auth', done: 4, total: 5 })
   await worker.deactivate()
   main.options.watchDelayMs = 300
+})
+
+test('links a bare workspace to a store and then reads the store', async () => {
+  const store = fixture()
+  const bare = mkdtempSync(join(tmpdir(), 'bare-'))
+  const { clearStoreCache } = await import('./store')
+  clearStoreCache()
+  main.options.storeRunner = async () => JSON.stringify({ stores: [{ id: 'isotech', root: store }] })
+  const worker = await mountWorker(main, { host: host(bare) })
+  assert.deepEqual(await worker.request('openspec.stores'), { stores: [{ id: 'isotech' }] })
+  const state = (await worker.request('openspec.linkStore', { store: 'isotech' })) as {
+    status: string
+    store?: string
+    changes: unknown[]
+  }
+  assert.equal(state.status, 'ok')
+  assert.equal(state.store, 'isotech')
+  assert.equal(state.changes.length, 2)
+  assert.equal(readFileSync(join(bare, 'openspec', 'config.yaml'), 'utf8'), 'store: isotech\n')
+  await worker.deactivate()
+  clearStoreCache()
+})
+
+test('linking refuses to overwrite an existing config', async () => {
+  const ws = mkdtempSync(join(tmpdir(), 'cfg-'))
+  mkdirSync(join(ws, 'openspec'))
+  writeFileSync(join(ws, 'openspec', 'config.yaml'), 'schema: spec-driven\n')
+  const { clearStoreCache } = await import('./store')
+  clearStoreCache()
+  main.options.storeRunner = async () => JSON.stringify({ stores: [{ id: 'isotech', root: fixture() }] })
+  const worker = await mountWorker(main, { host: host(ws) })
+  await assert.rejects(worker.request('openspec.linkStore', { store: 'isotech' }), /already has an OpenSpec config/)
+  assert.equal(readFileSync(join(ws, 'openspec', 'config.yaml'), 'utf8'), 'schema: spec-driven\n')
+  await worker.deactivate()
+  clearStoreCache()
 })
 
 test('reports no-openspec for a bare folder and inits it', async () => {

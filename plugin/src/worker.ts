@@ -3,7 +3,15 @@ import type { OrcaWorkerApi } from 'orca/worker'
 import { hasOpenSpec, readChanges, readSpecs } from './openspec'
 import type { OpenSpecState, OpsxStep } from './protocol'
 import { watchFolder, type FolderWatch } from './watch'
-import { clearStoreCache, resolveStore, runOpenSpecStoreList, workspaceStoreId, type StoreListRunner } from './store'
+import {
+  clearStoreCache,
+  listStores,
+  resolveStore,
+  runOpenSpecStoreList,
+  workspaceStoreId,
+  writeStoreLink,
+  type StoreListRunner
+} from './store'
 import { join } from 'node:path'
 
 /** The live watcher on the focused workspace's openspec/ folder, if any. */
@@ -248,6 +256,20 @@ export default function activate(orca: OrcaWorkerApi): void {
   orca.panels.handle('openspec.agents', async () => {
     const preferred = await defaultAgent(orca)
     return { agents: [preferred, ...AGENTS.filter((a) => a !== preferred)], defaultAgent: preferred }
+  })
+  orca.panels.handle('openspec.stores', async () => {
+    clearStoreCache() // the "not set up" screen should see stores registered a moment ago
+    const stores = await listStores(options.storeRunner)
+    return { stores: stores.map((s) => ({ id: s.id })) }
+  })
+  orca.panels.handle('openspec.linkStore', async ({ store }) => {
+    const ws = await focused(orca)
+    if (!ws) throw Object.assign(new Error('No workspace is focused.'), { code: 'invalid_params' })
+    if (ws.hostId && ws.hostId !== 'local') {
+      throw Object.assign(new Error('Remote workspaces are not supported yet.'), { code: 'invalid_params' })
+    }
+    await writeStoreLink(ws.path, store, options.storeRunner)
+    return refresh() // starts watching the store and tells open panels
   })
   orca.panels.handle('openspec.init', async () => {
     const ws = await focused(orca)

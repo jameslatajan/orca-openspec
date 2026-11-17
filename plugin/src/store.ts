@@ -1,7 +1,7 @@
 // OpenSpec stores: a workspace's openspec/config.yaml may say `store: <id>`, meaning its changes
 // and specs live in a registered store folder. Pure helpers plus a cached `openspec store list`.
 import { exec } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 /** The top-level `store:` value in an OpenSpec config, or null. Ignores comments and quotes. */
@@ -44,28 +44,70 @@ export function clearStoreCache(): void {
   cache = null
 }
 
+/** Registered stores (id → root), from the cached `openspec store list --json`. */
+async function storeMap(run: StoreListRunner, purpose: string): Promise<Map<string, string>> {
+  if (cache) return cache
+  let out: string
+  try {
+    out = await run()
+  } catch (err) {
+    const why = err instanceof Error ? err.message : String(err)
+    throw new StoreError(`The openspec CLI is needed to ${purpose} (${why}).`)
+  }
+  try {
+    const parsed = JSON.parse(out) as { stores?: { id?: unknown; root?: unknown }[] }
+    cache = new Map(
+      (parsed.stores ?? [])
+        .filter((s) => typeof s.id === 'string' && typeof s.root === 'string')
+        .map((s) => [s.id as string, s.root as string])
+    )
+    return cache
+  } catch {
+    throw new StoreError(`Could not read the output of \`openspec store list --json\` to ${purpose}.`)
+  }
+}
+
+/** The stores registered on this machine. */
+export async function listStores(run: StoreListRunner = runOpenSpecStoreList): Promise<{ id: string; root: string }[]> {
+  return [...(await storeMap(run, 'list stores'))].map(([id, root]) => ({ id, root }))
+}
+
+/** Store ids that are safe to write into a config line. */
+const STORE_ID = /^[A-Za-z0-9._-]+$/
+
+/** Links a workspace to a registered store by creating openspec/config.yaml with `store: <id>`.
+ *  Never overwrites: refuses when a config.yaml or config.yml already exists. */
+export async function writeStoreLink(
+  workspacePath: string,
+  id: string,
+  run: StoreListRunner = runOpenSpecStoreList
+): Promise<string> {
+  if (!STORE_ID.test(id)) throw new StoreError(`"${id}" is not a valid store id.`)
+  const stores = await storeMap(run, `link store "${id}"`)
+  if (!stores.has(id)) {
+    throw new StoreError(`Store "${id}" is not registered on this machine. Run \`openspec store register <path>\`.`)
+  }
+  const dir = join(workspacePath, 'openspec')
+  const file = join(dir, 'config.yaml')
+  if (existsSync(file) || existsSync(join(dir, 'config.yml'))) {
+    throw new StoreError('This workspace already has an OpenSpec config; it was left unchanged.')
+  }
+  mkdirSync(dir, { recursive: true })
+  try {
+    writeFileSync(file, `store: ${id}\n`, { flag: 'wx' }) // exclusive create: never overwrite
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'EEXIST') {
+      throw new StoreError('This workspace already has an OpenSpec config; it was left unchanged.')
+    }
+    throw err
+  }
+  return file
+}
+
 /** The store's root folder for `id`. Throws StoreError with a message that names the fix. */
 export async function resolveStore(id: string, run: StoreListRunner = runOpenSpecStoreList): Promise<string> {
-  if (!cache) {
-    let out: string
-    try {
-      out = await run()
-    } catch (err) {
-      const why = err instanceof Error ? err.message : String(err)
-      throw new StoreError(`The openspec CLI is needed to resolve store "${id}" (${why}).`)
-    }
-    try {
-      const parsed = JSON.parse(out) as { stores?: { id?: unknown; root?: unknown }[] }
-      cache = new Map(
-        (parsed.stores ?? [])
-          .filter((s) => typeof s.id === 'string' && typeof s.root === 'string')
-          .map((s) => [s.id as string, s.root as string])
-      )
-    } catch {
-      throw new StoreError(`Could not read the output of \`openspec store list --json\` to resolve store "${id}".`)
-    }
-  }
-  const root = cache.get(id)
+  await storeMap(run, `resolve store "${id}"`)
+  const root = cache!.get(id)
   if (!root) {
     throw new StoreError(`Store "${id}" is not registered on this machine. Run \`openspec store register <path>\`.`)
   }

@@ -2,6 +2,62 @@ import { assert, mockHost, mount, test } from 'orca/testing'
 import * as panel from './panel'
 import type { OpenSpecState } from './protocol'
 
+const bareState: OpenSpecState = { status: 'no-openspec', workspace: 'HIS COLIN', changes: [], specs: [] }
+
+test('not set up: link the workspace to a registered store', async () => {
+  const links: unknown[] = []
+  const linked: OpenSpecState = {
+    status: 'ok',
+    workspace: 'HIS COLIN',
+    store: 'isotech',
+    changes: [{ name: 'his-billing', done: 1, total: 2 }],
+    specs: []
+  }
+  const host = mockHost({
+    requests: {
+      'openspec.state': bareState,
+      'openspec.stores': { stores: [{ id: 'isotech' }, { id: 'acme' }] },
+      'openspec.linkStore': (input) => (links.push(input), linked)
+    }
+  })
+  const view = await mount(panel, { host })
+  assert.ok(view.find({ label: 'OpenSpec is not set up' }))
+  assert.ok(view.find({ text: 'Or use a store' }))
+  await view.select({ label: 'Store' }, 'isotech')
+  await view.press({ text: 'Link store' })
+  assert.deepEqual(links, [{ store: 'isotech' }])
+  assert.ok(view.find({ text: 'via store isotech' }))
+  assert.equal(view.find({ label: 'OpenSpec is not set up' }), null)
+  await view.unmount()
+})
+
+test('not set up: no stores registered shows how to register one', async () => {
+  const host = mockHost({
+    requests: { 'openspec.state': bareState, 'openspec.stores': { stores: [] } }
+  })
+  const view = await mount(panel, { host })
+  assert.ok(view.find({ text: /No OpenSpec stores are registered/ }))
+  assert.equal(view.find({ text: 'Link store' }), null)
+  assert.ok(view.find({ text: 'Init OpenSpec' }))
+  await view.unmount()
+})
+
+test('not set up: a failed link shows the error', async () => {
+  const host = mockHost({
+    requests: {
+      'openspec.state': bareState,
+      'openspec.stores': { stores: [{ id: 'isotech' }] },
+      'openspec.linkStore': () => {
+        throw new Error('This workspace already has an OpenSpec config; it was left unchanged.')
+      }
+    }
+  })
+  const view = await mount(panel, { host })
+  await view.press({ text: 'Link store' })
+  assert.ok(view.find({ text: /already has an OpenSpec config/ }))
+  await view.unmount()
+})
+
 const ok: OpenSpecState = {
   status: 'ok',
   workspace: 'demo',

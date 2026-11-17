@@ -20,6 +20,10 @@ declare module 'orca' {
     'openspec.setSystemPrefixes': { input: { prefixes: string[] }; output: { prefixes: string[] } }
     /** Opens a terminal running `openspec init` in the focused workspace. */
     'openspec.init': { output: { terminalId: string } }
+    /** The OpenSpec stores registered on this machine. */
+    'openspec.stores': { output: { stores: { id: string }[] } }
+    /** Links the focused workspace to a store (creates openspec/config.yaml) and answers fresh state. */
+    'openspec.linkStore': { input: { store: string }; output: OpenSpecState }
   }
   interface PluginPanelEvents {
     /** Fresh state after a workspace switch, a launched agent finishing, or a refresh. */

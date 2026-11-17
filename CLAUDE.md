@@ -42,6 +42,9 @@ The authoritative plugin API reference ships with the CLI. Read it instead of gu
   - a debounced recursive `fs.watch` on `openspec/` (`src/watch.ts`).
   `retarget()` keeps one module-level watcher and skips a retarget when the path is unchanged; `deactivate()` closes it.
 - **Stores:** `src/store.ts` reads a top-level `store: <id>` from the workspace's `openspec/config.yaml`, then resolves it with `openspec store list --json`. The listing is cached; only the Refresh button and the palette Refresh clear it, because `workspace.changed` fires on every terminal open or close. `dataRootOf()` returns the store root or the workspace, and both reading and watching use it. Tests inject `options.storeRunner`.
+- **Linking a store:** the OpenSpec CLI has no link command, so `writeStoreLink()` in `store.ts` creates `openspec/config.yaml` itself.
+  - It checks the id against `^[A-Za-z0-9._-]+$` and the registered stores, then writes with the `wx` flag. It refuses when `config.yaml` or `config.yml` exists.
+  - Worker requests: `openspec.stores` (clears the cache first) and `openspec.linkStore`, which writes the file, then calls `refresh()`.
 - **System filter (store workspaces):** OpenSpec records no project membership, so the panel filters by name prefix.
   - `view.ts`: `prefixOf`, `knownPrefixes` (a prefix shared by ≥3 items), `guessPrefixes` (from the workspace name) and `splitBySystem` (into `mine` and `shared`; other systems are dropped).
   - The worker stores each workspace's list under `systemPrefixes:<workspaceId>`.
