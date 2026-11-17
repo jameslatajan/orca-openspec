@@ -49,6 +49,8 @@ The authoritative plugin API reference ships with the CLI. Read it instead of gu
 - `engines.orca` must be ≥ the newest `Since` of anything used. It is `>=1.4.248` because a capability requires it, and `plugin check` fails if it is lower.
 - Adding a capability, command or event changes the approval fingerprint. The user must re-approve the plugin (`orca plugin dev load ./plugin --approve <fingerprint>`), so never approve on their behalf. Code-only edits reload without approval.
 - `<Progress value>` is 0–100, not 0–1.
+- Panel-only UI state (tab, filters, chip) uses `persist: 'plugin'`. With `persist: 'storage'`, a controlled `Input` or a chip loses input to the storage echo: typing "AUTH" kept "A". Reserve `'storage'` for values the worker reads, such as `selectedChange`.
+- Status and filter logic lives in `src/view.ts` (pure functions). Keep `panel.tsx` declarative.
 - In panel tests, `view.find({ text })` matches the whole element text exactly, so use a RegExp for partial matches. Don't send `undefined` fields in request payloads, because `deepEqual` sees them.
 - Worker tests run the real module with `mockHost({ results: {...} })` and `mountWorker`. Watcher tests set `main.options.watchDelayMs` low and count posts only after the edit, because startup emits extra posts.
 

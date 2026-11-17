@@ -4,9 +4,12 @@ An [Orca](https://github.com/stablyai/orca) plugin for [OpenSpec](https://github
 
 ## Features
 
-- **Changes:** every active change in `openspec/changes/`, with a progress bar and checked/total task count from its `tasks.md`.
-- **Specs:** every capability under `openspec/specs/`, including nested ones such as `billing/invoices`.
-- **Actions:** **New change**, **Apply**, **Verify** and **Archive** start an agent in the current workspace with `/opsx:propose`, `/opsx:apply <change>`, `/opsx:verify <change>` or `/opsx:archive <change>`.
+- **Changes tab:** every active change in `openspec/changes/` as a compact row with a status (Planning, Not started, In progress, Ready to archive), a progress bar and the checked/total task count from its `tasks.md`. You can filter by name, or use the All / In progress / Done chips.
+- **Specs tab:** every capability under `openspec/specs/`, including nested ones such as `billing/invoices`, with a name filter.
+- **Actions:**
+  - **+** (New change) in the header starts an agent with `/opsx:propose`.
+  - Selecting a change shows **Apply** and **Verify**. Once every task is done, **Archive** replaces Verify.
+  - Apply, Verify and Archive start an agent in the current workspace with `/opsx:apply <change>`, `/opsx:verify <change>` or `/opsx:archive <change>`.
 - **Palette commands:** `OpenSpec: New change`, `Apply change`, `Verify change`, `Archive change` and `Refresh panel`. Apply, Verify and Archive use the change selected in the panel, or the only change if there is just one.
 - **Auto-refresh:** the panel updates about 300 ms after files in `openspec/` change, when you switch workspace, and when an agent the plugin started finishes.
 - **Init OpenSpec:** in a workspace without an `openspec/` folder, a button opens a terminal running `openspec init`.
