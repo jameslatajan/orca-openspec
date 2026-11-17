@@ -5,7 +5,7 @@ An [Orca](https://github.com/stablyai/orca) plugin for [OpenSpec](https://github
 ## Features
 
 - **Changes tab:** every active change in `openspec/changes/` as a compact row with a status (Planning, Not started, In progress, Ready to archive), a progress bar and the checked/total task count from its `tasks.md`. You can filter by name, or use the All / In progress / Done chips.
-- **Specs tab:** every capability under `openspec/specs/`, including nested ones such as `billing/invoices`, with a name filter.
+- **Specs tab:** every capability under `openspec/specs/`, including nested ones such as `billing/invoices`, with a name filter. Specs show in a table that loads 40 at a time as you scroll, so stores with hundreds of specs stay quick. The filter still searches all of them.
 - **Actions:**
   - **+** (New change) in the header opens a form. Describe the change, pick an agent (claude, codex, gemini, opencode, cursor or copilot), then press **Explore** (`/openspec-explore <description>`) or **Propose** (`/openspec-propose <description>`). With **claude**, you can also pick a **Model** (Default, Opus, Sonnet or Haiku): the plugin types `/model <name>` before the command.
   - Every action opens the agent's terminal where you can see it. The plugin waits until the agent is ready, then types the command for you.

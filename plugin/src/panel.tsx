@@ -21,15 +21,19 @@ import {
   Spinner,
   Stack,
   Tab,
+  Table,
   Tabs,
   Text,
   Textarea,
   Toolbar,
+  update,
   type PanelContext
 } from 'orca'
 import type { ChangeInfo, OpenSpecState, OpsxStep } from './protocol'
 import {
+  BATCH,
   filterByName,
+  firstBatch,
   guessPrefixes,
   isReady,
   knownPrefixes,
@@ -49,6 +53,8 @@ const tab = atom<string>('tab', 'changes', { persist: 'plugin' })
 const changeFilter = atom<string>('changeFilter', '', { persist: 'plugin' })
 const specFilter = atom<string>('specFilter', '', { persist: 'plugin' })
 const chip = atom<Chip>('chip', 'all', { persist: 'plugin' })
+/** How many spec rows the Specs table draws; grows by BATCH as the user scrolls. */
+const specLimit = atom(BATCH)
 
 const CHIPS: { value: Chip; label: string }[] = [
   { value: 'all', label: 'All' },
@@ -104,6 +110,7 @@ async function linkStore(): Promise<void> {
 }
 
 function receive(next: OpenSpecState): void {
+  if (read(state)?.workspace !== next.workspace) set(specLimit, BATCH) // new workspace: first batch
   set(state, next)
   set(updatedAt, Date.now())
   if (next.status === 'no-openspec' && !next.store) void loadStores()
@@ -163,7 +170,10 @@ function SystemBar(props: { prefixes: string[] }) {
               size="xs"
               variant={m.value === mode ? 'solid' : 'outline'}
               tone={m.value === mode ? 'accent' : 'neutral'}
-              onPress={() => set(systemMode, m.value)}
+              onPress={() => {
+                set(systemMode, m.value)
+                set(specLimit, BATCH)
+              }}
             >
               {m.label}
             </Button>
@@ -531,16 +541,17 @@ function ChangesTab(props: { changes: ChangeInfo[]; shared?: ChangeInfo[] }) {
   )
 }
 
-function specRows(names: string[]) {
-  return names.map((name) => <ListItem key={name} title={name} icon="file-text" />)
-}
-
 function SpecsTab(props: { specs: string[]; shared?: string[] }) {
   const text = read(specFilter)
+  const grouped = props.shared !== undefined
   const mineVisible = filterByName(props.specs, text, (s) => s)
   const sharedVisible = props.shared ? filterByName(props.shared, text, (s) => s) : []
-  const visible = [...mineVisible, ...sharedVisible]
+  const visible = [
+    ...mineVisible.map((name) => ({ name, group: 'This system' })),
+    ...sharedVisible.map((name) => ({ name, group: 'Shared' }))
+  ]
   const total = props.specs.length + (props.shared?.length ?? 0)
+  const { rows, hasMore } = firstBatch(visible, read(specLimit))
   return (
     <Stack gap="sm">
       <Input
@@ -549,24 +560,24 @@ function SpecsTab(props: { specs: string[]; shared?: string[] }) {
         type="search"
         placeholder="Filter specs"
         value={text}
-        onChange={(v) => set(specFilter, v)}
+        onChange={(v) => {
+          set(specFilter, v)
+          set(specLimit, BATCH) // a new search starts from the first batch
+        }}
       />
       {total === 0 ? (
         <Text muted>No specs yet.</Text>
       ) : visible.length === 0 ? (
         <Text muted>No matching specs.</Text>
       ) : (
-        <Stack gap="xs">
-          {mineVisible.length ? <List label="Specs">{specRows(mineVisible)}</List> : null}
-          {sharedVisible.length ? (
-            <Stack gap="xs">
-              <Text muted size="xs">
-                Shared
-              </Text>
-              <List label="Shared specs">{specRows(sharedVisible)}</List>
-            </Stack>
-          ) : null}
-        </Stack>
+        <Table
+          label="Specs"
+          maxHeight="lg"
+          columns={grouped ? [{ key: 'name', label: 'Spec' }, { key: 'group', label: 'Group' }] : [{ key: 'name', label: 'Spec' }]}
+          rows={rows.map((r) => ({ key: r.name, cells: grouped ? { name: r.name, group: r.group } : { name: r.name } }))}
+          hasMore={hasMore}
+          onLoadMore={() => update(specLimit, (n) => n + BATCH)}
+        />
       )}
     </Stack>
   )

@@ -66,3 +66,15 @@ test('splits items into this system and shared, dropping other systems', () => {
   assert.deepEqual(mine, ['eclaims-import', 'eclaims-fallback', 'eclaims-print'])
   assert.deepEqual(shared, ['access-control', 'absences-page', 'doh'])
 })
+
+import { BATCH, firstBatch } from './view'
+
+test('cuts a list into its first batch', () => {
+  const items = Array.from({ length: 125 }, (_, i) => `spec-${i}`)
+  const first = firstBatch(items, BATCH)
+  assert.equal(first.rows.length, 40)
+  assert.equal(first.hasMore, true)
+  assert.equal(firstBatch(items, 120).hasMore, true)
+  assert.deepEqual(firstBatch(items, 160), { rows: items, hasMore: false })
+  assert.deepEqual(firstBatch([], BATCH), { rows: [], hasMore: false })
+})

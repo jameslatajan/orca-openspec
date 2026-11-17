@@ -64,6 +64,7 @@ The authoritative plugin API reference ships with the CLI. Read it instead of gu
 - Agent prompts come from `promptFor()` in `worker.ts` and follow the `commandStyle` setting. The default `skill` sends `/openspec-apply-change <change>` and so on. Bare `/opsx:*` commands don't exist on a default install: the agent opens and silently does nothing.
 - Panel-only UI state (tab, filters, chip) uses `persist: 'plugin'`. With `persist: 'storage'`, a controlled `Input` or a chip loses input to the storage echo: typing "AUTH" kept "A". Reserve `'storage'` for values the worker reads, such as `selectedChange`.
 - Status and filter logic lives in `src/view.ts` (pure functions). Keep `panel.tsx` declarative.
+- The Specs tab is a `Table` with `hasMore`/`onLoadMore`. `specLimit` grows by `BATCH` (40) and is reset in the handlers that change the filter, the mode or the workspace, never during render. In tests, use `view.rowsOf`, `view.columnsOf` and `view.loadMore`; table cells aren't found by `find({ text })`.
 - In panel tests, `view.find({ text })` matches the whole element text exactly, so use a RegExp for partial matches. Don't send `undefined` fields in request payloads, because `deepEqual` sees them.
 - Worker tests run the real module with `mockHost({ results: {...} })` and `mountWorker`. Watcher tests set `main.options.watchDelayMs` low and count posts only after the edit, because startup emits extra posts.
 

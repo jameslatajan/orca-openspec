@@ -71,3 +71,11 @@ export function splitBySystem<T>(
   }
   return { mine, shared }
 }
+
+/** Rows drawn per batch in lazily loaded lists. */
+export const BATCH = 40
+
+/** The first `limit` items, and whether more remain. */
+export function firstBatch<T>(items: readonly T[], limit: number): { rows: T[]; hasMore: boolean } {
+  return { rows: items.slice(0, limit), hasMore: items.length > limit }
+}
