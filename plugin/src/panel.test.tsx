@@ -19,6 +19,7 @@ function setupHost(extra: Record<string, unknown> = {}) {
     requests: {
       'openspec.state': ok,
       'openspec.launch': (input) => (launches.push(input), { terminalId: 't1' }),
+      'openspec.agents': { agents: ['claude', 'codex', 'gemini'], defaultAgent: 'claude' },
       ...extra
     }
   })
@@ -68,9 +69,6 @@ test('action bar: Apply and Verify, Archive only when ready', async () => {
     { step: 'verify', change: 'add-auth' },
     { step: 'archive', change: 'billing-export' }
   ])
-
-  await view.press({ label: 'New change' })
-  assert.deepEqual(launches[3], { step: 'propose' })
   assert.deepEqual(view.errors, [])
   await view.unmount()
 })
@@ -138,5 +136,64 @@ test('Clear filters resets the chip and the name filter', async () => {
   await view.press({ text: 'Clear filters' })
   assert.ok(view.find({ label: 'add-auth' }))
   assert.ok(view.find({ label: 'billing-export' }))
+  await view.unmount()
+})
+
+test('New change opens a form; Explore sends the description and agent', async () => {
+  const { host, launches } = setupHost()
+  const view = await mount(panel, { host })
+  await view.press({ label: 'New change' })
+  assert.equal(launches.length, 0)
+  assert.ok(view.find({ label: 'Describe the change' }))
+  assert.equal(view.find({ text: 'Explore' })?.disabled, true)
+  assert.equal(view.find({ text: 'Propose' })?.disabled, true)
+
+  await view.type({ label: 'Describe the change' }, 'add dark mode')
+  await view.select({ label: 'Agent' }, 'codex')
+  assert.equal(view.find({ text: 'Explore' })?.disabled, false)
+  await view.press({ text: 'Explore' })
+  assert.deepEqual(launches, [{ step: 'explore', description: 'add dark mode', agent: 'codex' }])
+  assert.equal(view.find({ label: 'Describe the change' }), null)
+  assert.deepEqual(view.errors, [])
+  await view.unmount()
+})
+
+test('Propose from the form, and Cancel closes without launching', async () => {
+  const { host, launches } = setupHost()
+  const view = await mount(panel, { host })
+  await view.press({ label: 'New change' })
+  await view.type({ label: 'Describe the change' }, 'billing export')
+  await view.press({ text: 'Cancel' })
+  assert.equal(view.find({ label: 'Describe the change' }), null)
+  assert.equal(launches.length, 0)
+
+  await view.press({ label: 'New change' })
+  assert.equal(view.find({ text: 'Propose' })?.disabled, true) // description was cleared
+  await view.type({ label: 'Describe the change' }, 'billing export')
+  await view.press({ text: 'Propose' })
+  assert.deepEqual(launches, [{ step: 'propose', description: 'billing export', agent: 'claude' }])
+  await view.unmount()
+})
+
+test('a failed launch keeps the form open with the error', async () => {
+  const { host } = setupHost({
+    'openspec.launch': () => {
+      throw new Error('agent not installed')
+    }
+  })
+  const view = await mount(panel, { host })
+  await view.press({ label: 'New change' })
+  await view.type({ label: 'Describe the change' }, 'x')
+  await view.press({ text: 'Explore' })
+  assert.ok(view.find({ label: 'Describe the change' }))
+  assert.ok(view.find({ text: /agent not installed/ }))
+  await view.unmount()
+})
+
+test('the palette command opens the form', async () => {
+  const { host } = setupHost()
+  const view = await mount(panel, { host })
+  await view.post('openspec.showForm', {})
+  assert.ok(view.find({ label: 'Describe the change' }))
   await view.unmount()
 })

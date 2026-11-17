@@ -14,12 +14,14 @@ import {
   Progress,
   read,
   Row,
+  Select,
   set,
   Spinner,
   Stack,
   Tab,
   Tabs,
   Text,
+  Textarea,
   Toolbar,
   type PanelContext
 } from 'orca'
@@ -56,6 +58,96 @@ async function call(fn: () => Promise<unknown>): Promise<void> {
 
 const run = (step: OpsxStep, change?: string) =>
   call(() => plugin.request('openspec.launch', change ? { step, change } : { step }))
+
+/** The New change form: panel-only state; the description is never persisted. */
+const formOpen = atom(false)
+const description = atom('')
+const formAgent = atom<string | null>(null)
+const agentOptions = atom<string[]>([])
+const formBusy = atom(false)
+const formError = atom<string | null>(null)
+
+async function openForm(): Promise<void> {
+  set(formError, null)
+  set(formOpen, true)
+  if (read(agentOptions).length === 0) {
+    try {
+      const { agents, defaultAgent } = await plugin.request('openspec.agents')
+      set(agentOptions, agents)
+      if (!read(formAgent)) set(formAgent, defaultAgent)
+    } catch {
+      set(agentOptions, ['claude'])
+      if (!read(formAgent)) set(formAgent, 'claude')
+    }
+  }
+}
+
+function closeForm(): void {
+  set(formOpen, false)
+  set(description, '')
+  set(formError, null)
+}
+
+async function startFromForm(step: 'explore' | 'propose'): Promise<void> {
+  const text = read(description).trim()
+  if (!text || read(formBusy)) return
+  set(formBusy, true)
+  set(formError, null)
+  try {
+    const agent = read(formAgent) ?? undefined
+    await plugin.request('openspec.launch', agent ? { step, description: text, agent } : { step, description: text })
+    closeForm()
+  } catch (err) {
+    set(formError, err instanceof Error ? err.message : String(err))
+  } finally {
+    set(formBusy, false)
+  }
+}
+
+function NewChangeForm() {
+  const text = read(description)
+  const busy = read(formBusy)
+  const empty = text.trim().length === 0
+  const agents = read(agentOptions)
+  const err = read(formError)
+  return (
+    <Box direction="column" gap="sm" padding="sm">
+      <Textarea
+        label="Describe the change"
+        placeholder="What do you want to build or fix?"
+        rows={4}
+        value={text}
+        disabled={busy}
+        onChange={(v) => set(description, v)}
+        onSubmit={() => startFromForm('explore')}
+      />
+      <Select
+        label="Agent"
+        value={read(formAgent) ?? agents[0] ?? 'claude'}
+        options={(agents.length ? agents : ['claude']).map((a) => ({ value: a, label: a }))}
+        disabled={busy}
+        onChange={(v) => set(formAgent, v)}
+      />
+      {err ? <Callout tone="danger">{err}</Callout> : null}
+      <Row gap="xs">
+        <Button variant="solid" tone="accent" icon="search" disabled={empty || busy} onPress={() => startFromForm('explore')}>
+          Explore
+        </Button>
+        <Button variant="outline" disabled={empty || busy} onPress={() => startFromForm('propose')}>
+          Propose
+        </Button>
+        <Button variant="ghost" disabled={busy} onPress={closeForm}>
+          Cancel
+        </Button>
+      </Row>
+      {busy ? (
+        <Text muted size="xs">
+          Starting the agent and waiting for it to be ready…
+        </Text>
+      ) : null}
+    </Box>
+  )
+}
 const init = () => call(() => plugin.request('openspec.init'))
 const clearFilters = () => {
   set(chip, 'all')
@@ -64,6 +156,7 @@ const clearFilters = () => {
 
 export function setup(ctx: PanelContext): void {
   ctx.subscriptions.push(plugin.on('openspec.changed', (payload) => set(state, payload)))
+  ctx.subscriptions.push(plugin.on('openspec.showForm', () => void openForm()))
   void load()
 }
 
@@ -73,7 +166,13 @@ function Header(props: { title: string; canCreate: boolean }) {
       <Heading>{props.title}</Heading>
       <Row gap="xs">
         {props.canCreate ? (
-          <IconButton icon="add" label="New change" variant="solid" tone="accent" onPress={() => run('propose')} />
+          <IconButton
+            icon={read(formOpen) ? 'close' : 'add'}
+            label={read(formOpen) ? 'Close new change' : 'New change'}
+            variant="solid"
+            tone="accent"
+            onPress={() => (read(formOpen) ? closeForm() : openForm())}
+          />
         ) : null}
         <IconButton icon="refresh" label="Refresh" variant="ghost" onPress={load} />
       </Row>
@@ -228,6 +327,7 @@ export default function Panel() {
   return (
     <Stack gap="md">
       <Header title={title} canCreate />
+      {read(formOpen) ? <NewChangeForm /> : null}
       {errorBox}
       <Tabs label="OpenSpec views" value={read(tab)} onChange={(v) => set(tab, v)}>
         <Tab value="changes" label={`Changes (${s.changes.length})`}>

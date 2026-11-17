@@ -7,7 +7,8 @@ An [Orca](https://github.com/stablyai/orca) plugin for [OpenSpec](https://github
 - **Changes tab:** every active change in `openspec/changes/` as a compact row with a status (Planning, Not started, In progress, Ready to archive), a progress bar and the checked/total task count from its `tasks.md`. You can filter by name, or use the All / In progress / Done chips.
 - **Specs tab:** every capability under `openspec/specs/`, including nested ones such as `billing/invoices`, with a name filter.
 - **Actions:**
-  - **+** (New change) in the header starts an agent with `/openspec-propose`; the agent asks what to build.
+  - **+** (New change) in the header opens a form. Describe the change, pick an agent (claude, codex, gemini, opencode, cursor or copilot), then press **Explore** (`/openspec-explore <description>`) or **Propose** (`/openspec-propose <description>`).
+  - Every action opens the agent's terminal where you can see it. The plugin waits until the agent is ready, then types the command for you.
   - Selecting a change shows **Apply** and **Verify**. Once every task is done, **Archive** replaces Verify.
   - Apply, Verify and Archive start an agent in the current workspace with the matching OpenSpec command for the change: `/openspec-apply-change <change>`, `/openspec-verify-change <change>` or `/openspec-archive-change <change>`. If your agent has `/opsx:*` commands instead, set **Command style** to OPSX.
 - **Palette commands:** `OpenSpec: New change`, `Apply change`, `Verify change`, `Archive change` and `Refresh panel`. Apply, Verify and Archive use the change selected in the panel, or the only change if there is just one.
@@ -39,7 +40,9 @@ The plugin runs a Node worker with your user account's access. It asks for:
 | `workspace:read` | Finding the focused workspace and its path |
 | `agent:read` | Refreshing when a launched agent finishes |
 | `agent:launch` | Starting agents for OpenSpec commands |
-| `terminal:send` | Running `openspec init` in a terminal |
+| `terminal:send` | Running `openspec init`, and typing the OpenSpec command into the agent |
+| `terminal:read` | Seeing when a new agent is ready for input |
+| `workspace:write` | Showing the new agent's terminal |
 | `notifications:show` | Telling you to select a change first |
 | `storage:own`, `settings:own` | Remembering the selected change and the agent setting |
 
@@ -52,6 +55,7 @@ The plugin runs a Node worker with your user account's access. It asks for:
 
 ## Limitations
 
+- Every agent gets the same slash command. Agents other than Claude Code may name or invoke OpenSpec commands differently.
 - Remote and SSH workspaces are not supported yet; the panel says so.
 - OpenSpec stores (`--store`) are not read; only the workspace's own `openspec/` folder is.
 

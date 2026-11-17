@@ -1,4 +1,4 @@
-// The plugin's worker: reads openspec/ for the focused workspace and launches /opsx agents.
+// The plugin's worker: reads openspec/ for the focused workspace and launches OpenSpec agents.
 import type { OrcaWorkerApi } from 'orca/worker'
 import { hasOpenSpec, readChanges, readSpecs } from './openspec'
 import type { OpenSpecState, OpsxStep } from './protocol'
@@ -7,8 +7,20 @@ import { join } from 'node:path'
 
 /** The live watcher on the focused workspace's openspec/ folder, if any. */
 let current: FolderWatch | null = null
-/** Debounce for file events; tests shorten it. */
-export const options = { watchDelayMs: 300 }
+/** Timings; tests shorten them. */
+export const options = { watchDelayMs: 300, readyPollMs: 500, readyTimeoutMs: 30_000 }
+
+/** Agent kinds the New change form offers. */
+export const AGENTS = ['claude', 'codex', 'gemini', 'opencode', 'cursor', 'copilot']
+
+const INPUT_MARKER = /^\s*[│|]?\s*[❯>›]/
+
+/** True when the agent's screen shows an input prompt in its last lines. */
+export function isAgentReady(lines: readonly string[]): boolean {
+  return lines.slice(-15).some((line) => INPUT_MARKER.test(line))
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 function stopWatching(): void {
   current?.close()
@@ -49,6 +61,7 @@ export type CommandStyle = 'skill' | 'opsx'
 
 /** OpenSpec skill command names, as `openspec init` installs them for Claude Code. */
 const SKILLS: Record<OpsxStep, string> = {
+  explore: 'openspec-explore',
   propose: 'openspec-propose',
   apply: 'openspec-apply-change',
   verify: 'openspec-verify-change',
@@ -59,9 +72,52 @@ export function commandStyleOf(value: unknown): CommandStyle {
   return value === 'opsx' ? 'opsx' : 'skill'
 }
 
-export function promptFor(step: OpsxStep, change: string | undefined, style: CommandStyle): string {
+/** `arg` is the change name, or the description for explore/propose. Newlines become spaces
+ *  so the whole prompt is sent as one line. */
+export function promptFor(step: OpsxStep, arg: string | undefined, style: CommandStyle): string {
   const command = style === 'opsx' ? `/opsx:${step}` : `/${SKILLS[step]}`
-  return change ? `${command} ${change}` : command
+  const text = arg?.replace(/\s*\r?\n\s*/g, ' ').trim()
+  return text ? `${command} ${text}` : command
+}
+
+async function defaultAgent(orca: OrcaWorkerApi): Promise<string> {
+  const setting = await orca.settings.get('agent')
+  return typeof setting === 'string' && setting ? setting : 'claude'
+}
+
+/** Starts an agent, shows its terminal, waits until it accepts input, then types the prompt. */
+async function launchVisible(
+  orca: OrcaWorkerApi,
+  workspaceId: string,
+  agent: string,
+  prompt: string
+): Promise<string> {
+  const { terminalId } = await orca.host.call('agent.launch', { workspaceId, agent })
+  try {
+    await orca.host.call('terminal.focus', { terminalId })
+  } catch (err) {
+    orca.log(`openspec: could not show terminal: ${err instanceof Error ? err.message : String(err)}`)
+  }
+  let previous = ''
+  let ready = false
+  const deadline = Date.now() + options.readyTimeoutMs
+  while (Date.now() < deadline) {
+    await sleep(options.readyPollMs)
+    try {
+      const { lines } = await orca.host.call('terminal.read', { terminalId, maxLines: 60 })
+      const screen = lines.join('\n')
+      if (isAgentReady(lines) && screen === previous) {
+        ready = true
+        break
+      }
+      previous = screen
+    } catch {
+      // The terminal may not be readable for a moment after launch; keep polling.
+    }
+  }
+  if (!ready) orca.log(`openspec: ${agent} did not look ready after ${options.readyTimeoutMs} ms; sending anyway`)
+  await orca.host.call('terminal.sendText', { terminalId, text: prompt, enter: true })
+  return terminalId
 }
 
 export default function activate(orca: OrcaWorkerApi): void {
@@ -108,17 +164,12 @@ export default function activate(orca: OrcaWorkerApi): void {
     return post()
   }
 
-  const launch = async (step: OpsxStep, change?: string): Promise<{ terminalId: string }> => {
+  const launch = async (step: OpsxStep, arg?: string, agentKind?: string): Promise<{ terminalId: string }> => {
     const ws = await focused(orca)
     if (!ws) throw Object.assign(new Error('No workspace is focused.'), { code: 'invalid_params' })
-    const setting = await orca.settings.get('agent')
-    const agent = typeof setting === 'string' && setting ? setting : 'claude'
+    const agent = agentKind && agentKind.trim() ? agentKind.trim() : await defaultAgent(orca)
     const style = commandStyleOf(await orca.settings.get('commandStyle'))
-    const { terminalId } = await orca.host.call('agent.launch', {
-      workspaceId: ws.workspaceId,
-      agent,
-      prompt: promptFor(step, change, style)
-    })
+    const terminalId = await launchVisible(orca, ws.workspaceId, agent, promptFor(step, arg, style))
     launched.add(terminalId)
     return { terminalId }
   }
@@ -127,7 +178,13 @@ export default function activate(orca: OrcaWorkerApi): void {
     await retarget()
     return readState(orca)
   })
-  orca.panels.handle('openspec.launch', ({ step, change }) => launch(step, change))
+  orca.panels.handle('openspec.launch', ({ step, change, description, agent }) =>
+    launch(step, change ?? description, agent)
+  )
+  orca.panels.handle('openspec.agents', async () => {
+    const preferred = await defaultAgent(orca)
+    return { agents: [preferred, ...AGENTS.filter((a) => a !== preferred)], defaultAgent: preferred }
+  })
   orca.panels.handle('openspec.init', async () => {
     const ws = await focused(orca)
     if (!ws) throw Object.assign(new Error('No workspace is focused.'), { code: 'invalid_params' })
@@ -144,7 +201,12 @@ export default function activate(orca: OrcaWorkerApi): void {
     if (e.state === 'done' && e.terminalId && launched.has(e.terminalId)) void refresh()
   })
 
-  orca.commands.register('openspec.propose', () => launch('propose').then(() => 'Started /opsx:propose'))
+  orca.commands.register('openspec.propose', async () => {
+    orca.panels.post('openspec.showForm', {})
+    const message = 'Describe the change in the OpenSpec panel, then press Explore or Propose.'
+    await orca.host.call('notifications.show', { title: 'OpenSpec', body: message })
+    return message
+  })
   for (const step of ['apply', 'verify', 'archive'] as const) {
     orca.commands.register(`openspec.${step}`, async () => {
       const state = await readState(orca)
@@ -164,7 +226,7 @@ export default function activate(orca: OrcaWorkerApi): void {
         return message
       }
       await launch(step, change)
-      return `Started /opsx:${step} ${change}`
+      return `Started ${step} for ${change}`
     })
   }
   orca.commands.register('openspec.refresh', async () => {

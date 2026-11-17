@@ -5,18 +5,25 @@ declare module 'orca' {
   interface PluginRequests {
     /** OpenSpec state of the focused workspace. */
     'openspec.state': { output: OpenSpecState }
-    /** Launches an agent with `/opsx:<step> [change]` in the focused workspace. */
-    'openspec.launch': { input: { step: OpsxStep; change?: string }; output: { terminalId: string } }
+    /** Launches an agent in the focused workspace and types the OpenSpec command for `step`. */
+    'openspec.launch': {
+      input: { step: OpsxStep; change?: string; description?: string; agent?: string }
+      output: { terminalId: string }
+    }
+    /** The agent kinds the New change form offers, the default first. */
+    'openspec.agents': { output: { agents: string[]; defaultAgent: string } }
     /** Opens a terminal running `openspec init` in the focused workspace. */
     'openspec.init': { output: { terminalId: string } }
   }
   interface PluginPanelEvents {
     /** Fresh state after a workspace switch, a launched agent finishing, or a refresh. */
     'openspec.changed': OpenSpecState
+    /** Asks open panels to show the New change form (from the palette command). */
+    'openspec.showForm': Record<string, never>
   }
 }
 
-export type OpsxStep = 'propose' | 'apply' | 'verify' | 'archive'
+export type OpsxStep = 'explore' | 'propose' | 'apply' | 'verify' | 'archive'
 
 export type ChangeInfo = { name: string; done: number; total: number | null }
 

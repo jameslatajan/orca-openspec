@@ -20,7 +20,13 @@ function fixture(): string {
   return root
 }
 
-function host(path: string) {
+// Launch timings for tests: poll fast, give up fast.
+main.options.readyPollMs = 5
+main.options.readyTimeoutMs = 200
+
+const READY = { lines: ['  Claude Code', '', '❯ ', '  ⏵⏵ bypass permissions on'], truncated: false }
+
+function host(path: string, settings: Record<string, string> = { agent: 'claude' }, extra: Record<string, unknown> = {}) {
   return mockHost({
     results: {
       'workspace.readContext': { workspaceId: 'w1', branch: 'main', displayName: 'demo', terminals: [] },
@@ -29,11 +35,19 @@ function host(path: string) {
         truncated: false
       },
       'agent.launch': { terminalId: 't1' },
-      'terminal.create': { terminalId: 't2' }
+      'terminal.create': { terminalId: 't2' },
+      'terminal.focus': { focused: true },
+      'terminal.read': READY,
+      'terminal.sendText': { accepted: true },
+      'notifications.show': { delivered: true },
+      ...extra
     },
-    settings: { agent: 'claude' }
+    settings
   })
 }
+
+const sent = (h: ReturnType<typeof host>) =>
+  (h.callsOf('terminal.sendText') as { text: string; enter?: boolean }[]).map((c) => c.text)
 
 test('counts task boxes the way OpenSpec does', () => {
   assert.deepEqual(countTasks('- [x] a\r\n- [ x] b\n- [ ] c\n- [-] d\n- []\nplain'), { done: 2, total: 5 })
@@ -48,16 +62,20 @@ test('reads changes and nested specs, skipping archive', () => {
   assert.deepEqual(readSpecs(root), ['auth', 'billing/invoices'])
 })
 
-test('answers state and launches /opsx agents', async () => {
+test('answers state, then launches, shows and types the command', async () => {
   const h = host(fixture())
   const worker = await mountWorker(main, { host: h })
   const state = (await worker.request('openspec.state')) as { status: string; changes: unknown[] }
   assert.equal(state.status, 'ok')
   assert.equal(state.changes.length, 2)
   await worker.request('openspec.launch', { step: 'apply', change: 'add-auth' })
-  assert.deepEqual(h.callsOf('agent.launch'), [
-    { workspaceId: 'w1', agent: 'claude', prompt: '/openspec-apply-change add-auth' }
+  assert.deepEqual(h.callsOf('agent.launch'), [{ workspaceId: 'w1', agent: 'claude' }])
+  assert.deepEqual(h.callsOf('terminal.focus'), [{ terminalId: 't1' }])
+  assert.deepEqual(h.callsOf('terminal.sendText'), [
+    { terminalId: 't1', text: '/openspec-apply-change add-auth', enter: true }
   ])
+  const order = h.calls.map((c) => c.method).filter((m) => m.startsWith('agent.') || m.startsWith('terminal.'))
+  assert.deepEqual([order[0], order[1], order[order.length - 1]], ['agent.launch', 'terminal.focus', 'terminal.sendText'])
   assert.deepEqual(worker.refusals, [])
   await worker.deactivate()
 })
@@ -110,25 +128,73 @@ test('builds skill prompts by default and opsx prompts on request', () => {
   assert.equal(main.promptFor('archive', 'a', 'skill'), '/openspec-archive-change a')
   assert.equal(main.promptFor('apply', 'a', 'opsx'), '/opsx:apply a')
   assert.equal(main.promptFor('propose', undefined, 'opsx'), '/opsx:propose')
+  assert.equal(main.promptFor('explore', 'idea', 'skill'), '/openspec-explore idea')
+  assert.equal(main.promptFor('explore', 'idea', 'opsx'), '/opsx:explore idea')
+  assert.equal(main.promptFor('explore', '  ', 'skill'), '/openspec-explore')
   assert.equal(main.commandStyleOf(undefined), 'skill')
   assert.equal(main.commandStyleOf('bogus'), 'skill')
   assert.equal(main.commandStyleOf('opsx'), 'opsx')
 })
 
 test('uses the commandStyle setting when launching', async () => {
-  const h = mockHost({
-    results: {
-      'workspace.readContext': { workspaceId: 'w1', branch: 'main', displayName: 'demo', terminals: [] },
-      'workspace.list': {
-        workspaces: [{ id: 'w1', kind: 'folder', name: 'demo', path: fixture(), branch: 'main', hostId: 'local' }],
-        truncated: false
-      },
-      'agent.launch': { terminalId: 't1' }
-    },
-    settings: { agent: 'claude', commandStyle: 'opsx' }
-  })
+  const h = host(fixture(), { agent: 'claude', commandStyle: 'opsx' })
   const worker = await mountWorker(main, { host: h })
   await worker.request('openspec.launch', { step: 'verify', change: 'add-auth' })
-  assert.equal((h.callsOf('agent.launch')[0] as { prompt: string }).prompt, '/opsx:verify add-auth')
+  assert.deepEqual(sent(h), ['/opsx:verify add-auth'])
+  await worker.deactivate()
+})
+
+test('explores with the form description and the chosen agent', async () => {
+  const h = host(fixture())
+  const worker = await mountWorker(main, { host: h })
+  await worker.request('openspec.launch', { step: 'explore', description: 'add dark\nmode', agent: 'codex' })
+  assert.deepEqual(h.callsOf('agent.launch'), [{ workspaceId: 'w1', agent: 'codex' }])
+  assert.deepEqual(sent(h), ['/openspec-explore add dark mode'])
+  await worker.deactivate()
+})
+
+test('sends anyway and logs when the agent never looks ready', async () => {
+  const h = host(fixture(), { agent: 'claude' }, { 'terminal.read': { lines: ['Starting…'], truncated: false } })
+  const worker = await mountWorker(main, { host: h })
+  await worker.request('openspec.launch', { step: 'propose', description: 'x' })
+  assert.deepEqual(sent(h), ['/openspec-propose x'])
+  assert.ok(worker.logs.some((l) => /did not look ready/.test(l)))
+  await worker.deactivate()
+})
+
+test('a focus failure does not stop the launch', async () => {
+  const h = host(fixture(), { agent: 'claude' }, {
+    'terminal.focus': () => {
+      throw Object.assign(new Error('no window'), { code: 'action_failed' })
+    }
+  })
+  const worker = await mountWorker(main, { host: h })
+  await worker.request('openspec.launch', { step: 'apply', change: 'add-auth' })
+  assert.deepEqual(sent(h), ['/openspec-apply-change add-auth'])
+  await worker.deactivate()
+})
+
+test('detects an agent input prompt', () => {
+  assert.equal(main.isAgentReady(['banner', '❯ Try "edit"', 'status']), true)
+  assert.equal(main.isAgentReady(['│ > ', 'footer']), true)
+  assert.equal(main.isAgentReady(['Loading…', 'please wait']), false)
+  assert.equal(main.isAgentReady([]), false)
+})
+
+test('offers agents with the default first', async () => {
+  const worker = await mountWorker(main, { host: host(fixture(), { agent: 'gemini' }) })
+  const res = (await worker.request('openspec.agents')) as { agents: string[]; defaultAgent: string }
+  assert.equal(res.defaultAgent, 'gemini')
+  assert.equal(res.agents[0], 'gemini')
+  assert.equal(res.agents.filter((a) => a === 'gemini').length, 1)
+  await worker.deactivate()
+})
+
+test('palette New change asks open panels to show the form', async () => {
+  const h = host(fixture())
+  const worker = await mountWorker(main, { host: h })
+  await worker.command('openspec.propose')
+  assert.ok(worker.posts.some((p) => p.event === 'openspec.showForm'))
+  assert.equal(h.callsOf('agent.launch').length, 0)
   await worker.deactivate()
 })
