@@ -28,7 +28,18 @@ import {
   type PanelContext
 } from 'orca'
 import type { ChangeInfo, OpenSpecState, OpsxStep } from './protocol'
-import { filterByName, isReady, matchesChip, progressText, statusOf, type Chip } from './view'
+import {
+  filterByName,
+  guessPrefixes,
+  isReady,
+  knownPrefixes,
+  matchesChip,
+  parsePrefixes,
+  progressText,
+  splitBySystem,
+  statusOf,
+  type Chip
+} from './view'
 
 const state = atom<OpenSpecState | null>(null)
 const actionError = atom<string | null>(null)
@@ -52,9 +63,115 @@ const updatedAt = atom<number | null>(null)
 /** The spinner stays at least this long, so a fast refresh is still visible. */
 export const MIN_SPIN_MS = 500
 
+/** Store workspaces: show this system's items (plus shared ones) or everything. */
+const systemMode = atom<'system' | 'all'>('systemMode', 'system', { persist: 'plugin' })
+/** Saved prefixes for the focused workspace (null = none saved, use the guess). */
+const savedPrefixes = atom<string[] | null>(null)
+/** Which workspace `savedPrefixes` belongs to, so a switch reloads them. */
+const prefixesFor = atom<string | null>(null)
+const editingSystem = atom(false)
+const systemDraft = atom('')
+
 function receive(next: OpenSpecState): void {
   set(state, next)
   set(updatedAt, Date.now())
+  const key = next.store ? `${next.workspace ?? ''}@${next.store}` : null
+  if (key && key !== read(prefixesFor)) void loadPrefixes(key)
+  if (!key) set(prefixesFor, null)
+}
+
+async function loadPrefixes(key: string): Promise<void> {
+  set(prefixesFor, key)
+  set(savedPrefixes, null)
+  set(editingSystem, false)
+  try {
+    const { prefixes } = await plugin.request('openspec.systemPrefixes')
+    if (read(prefixesFor) === key) set(savedPrefixes, prefixes)
+  } catch {
+    // Keep the guess when the saved list can't be read.
+  }
+}
+
+async function saveSystem(): Promise<void> {
+  const prefixes = parsePrefixes(read(systemDraft))
+  try {
+    const res = await plugin.request('openspec.setSystemPrefixes', { prefixes })
+    set(savedPrefixes, res.prefixes)
+    set(editingSystem, false)
+  } catch (err) {
+    set(actionError, err instanceof Error ? err.message : String(err))
+  }
+}
+
+/** This system's items and shared ones for a store workspace. */
+function systemView(s: OpenSpecState) {
+  const known = knownPrefixes([...s.changes.map((c) => c.name), ...s.specs])
+  const prefixes = read(savedPrefixes) ?? guessPrefixes(s.workspace ?? '', known)
+  return {
+    prefixes,
+    changes: splitBySystem(s.changes, prefixes, known, (c) => c.name),
+    specs: splitBySystem(s.specs, prefixes, known, (n) => n)
+  }
+}
+
+function SystemBar(props: { prefixes: string[] }) {
+  const mode = read(systemMode)
+  const editing = read(editingSystem)
+  const modes: { value: 'system' | 'all'; label: string }[] = [
+    { value: 'system', label: 'This system' },
+    { value: 'all', label: 'All' }
+  ]
+  return (
+    <Stack gap="xs">
+      <Toolbar label="Store scope" gap="xs">
+        {modes.map((m) => (
+          <Button
+            key={m.value}
+            size="sm"
+            variant={m.value === mode ? 'solid' : 'outline'}
+            tone={m.value === mode ? 'accent' : 'neutral'}
+            onPress={() => set(systemMode, m.value)}
+          >
+            {m.label}
+          </Button>
+        ))}
+      </Toolbar>
+      {editing ? (
+        <Row gap="xs">
+          <Input
+            label="System prefixes"
+            labelHidden
+            placeholder="e.g. eclaims, ess"
+            value={read(systemDraft)}
+            onChange={(v) => set(systemDraft, v)}
+          />
+          <Button size="sm" variant="solid" onPress={saveSystem}>
+            Save
+          </Button>
+          <Button size="sm" variant="ghost" onPress={() => set(editingSystem, false)}>
+            Cancel
+          </Button>
+        </Row>
+      ) : mode === 'system' ? (
+        <Row gap="xs">
+          <Text muted size="xs">
+            System: {props.prefixes.length ? props.prefixes.join(', ') : 'not set'}
+          </Text>
+          <Button
+            size="sm"
+            variant="ghost"
+            icon="edit"
+            onPress={() => {
+              set(systemDraft, props.prefixes.join(', '))
+              set(editingSystem, true)
+            }}
+          >
+            Edit system
+          </Button>
+        </Row>
+      ) : null}
+    </Stack>
+  )
 }
 
 async function load(): Promise<void> {
@@ -251,10 +368,28 @@ function Header(props: { title: string; canCreate: boolean; store?: string }) {
   )
 }
 
-function ChangesTab(props: { changes: ChangeInfo[] }) {
+function changeRows(items: ChangeInfo[], currentName: string | undefined) {
+  return items.map((c) => (
+    <ListItem
+      key={c.name}
+      title={c.name}
+      description={`${statusOf(c)} · ${progressText(c)}`}
+      current={c.name === currentName}
+      onPress={() => set(selected, c.name)}
+    >
+      {c.total ? <Progress label={`${c.name} progress`} labelHidden value={Math.round((100 * c.done) / c.total)} /> : null}
+    </ListItem>
+  ))
+}
+
+function ChangesTab(props: { changes: ChangeInfo[]; shared?: ChangeInfo[] }) {
   const text = read(changeFilter)
   const active = read(chip)
-  const visible = filterByName(props.changes, text, (c) => c.name).filter((c) => matchesChip(c, active))
+  const pick = (items: ChangeInfo[]) => filterByName(items, text, (c) => c.name).filter((c) => matchesChip(c, active))
+  const mineVisible = pick(props.changes)
+  const sharedVisible = props.shared ? pick(props.shared) : []
+  const visible = [...mineVisible, ...sharedVisible]
+  const total = props.changes.length + (props.shared?.length ?? 0)
   const current = visible.find((c) => c.name === read(selected))
   return (
     <Stack gap="sm">
@@ -279,7 +414,7 @@ function ChangesTab(props: { changes: ChangeInfo[] }) {
           </Button>
         ))}
       </Toolbar>
-      {props.changes.length === 0 ? (
+      {total === 0 ? (
         <Text muted>No active changes.</Text>
       ) : visible.length === 0 ? (
         <Row justify="between">
@@ -289,21 +424,17 @@ function ChangesTab(props: { changes: ChangeInfo[] }) {
           </Button>
         </Row>
       ) : (
-        <List label="Changes">
-          {visible.map((c) => (
-            <ListItem
-              key={c.name}
-              title={c.name}
-              description={`${statusOf(c)} · ${progressText(c)}`}
-              current={c.name === current?.name}
-              onPress={() => set(selected, c.name)}
-            >
-              {c.total ? (
-                <Progress label={`${c.name} progress`} labelHidden value={Math.round((100 * c.done) / c.total)} />
-              ) : null}
-            </ListItem>
-          ))}
-        </List>
+        <Stack gap="xs">
+          {mineVisible.length ? <List label="Changes">{changeRows(mineVisible, current?.name)}</List> : null}
+          {sharedVisible.length ? (
+            <Stack gap="xs">
+              <Text muted size="xs">
+                Shared
+              </Text>
+              <List label="Shared changes">{changeRows(sharedVisible, current?.name)}</List>
+            </Stack>
+          ) : null}
+        </Stack>
       )}
       {current ? (
         <Box direction="column" gap="sm" padding="sm">
@@ -332,9 +463,16 @@ function ChangesTab(props: { changes: ChangeInfo[] }) {
   )
 }
 
-function SpecsTab(props: { specs: string[] }) {
+function specRows(names: string[]) {
+  return names.map((name) => <ListItem key={name} title={name} icon="file-text" />)
+}
+
+function SpecsTab(props: { specs: string[]; shared?: string[] }) {
   const text = read(specFilter)
-  const visible = filterByName(props.specs, text, (s) => s)
+  const mineVisible = filterByName(props.specs, text, (s) => s)
+  const sharedVisible = props.shared ? filterByName(props.shared, text, (s) => s) : []
+  const visible = [...mineVisible, ...sharedVisible]
+  const total = props.specs.length + (props.shared?.length ?? 0)
   return (
     <Stack gap="sm">
       <Input
@@ -345,16 +483,22 @@ function SpecsTab(props: { specs: string[] }) {
         value={text}
         onChange={(v) => set(specFilter, v)}
       />
-      {props.specs.length === 0 ? (
+      {total === 0 ? (
         <Text muted>No specs yet.</Text>
       ) : visible.length === 0 ? (
         <Text muted>No matching specs.</Text>
       ) : (
-        <List label="Specs">
-          {visible.map((name) => (
-            <ListItem key={name} title={name} icon="file-text" />
-          ))}
-        </List>
+        <Stack gap="xs">
+          {mineVisible.length ? <List label="Specs">{specRows(mineVisible)}</List> : null}
+          {sharedVisible.length ? (
+            <Stack gap="xs">
+              <Text muted size="xs">
+                Shared
+              </Text>
+              <List label="Shared specs">{specRows(sharedVisible)}</List>
+            </Stack>
+          ) : null}
+        </Stack>
       )}
     </Stack>
   )
@@ -395,18 +539,27 @@ export default function Panel() {
       </Stack>
     )
 
+  const view = s.store ? systemView(s) : null
+  const filtered = view && read(systemMode) === 'system' ? view : null
+  const changeCount = filtered ? filtered.changes.mine.length + filtered.changes.shared.length : s.changes.length
+  const specCount = filtered ? filtered.specs.mine.length + filtered.specs.shared.length : s.specs.length
   return (
     <Stack gap="md">
       <Header title={title} canCreate store={s.store} />
       <UpdatedLine />
+      {view ? <SystemBar prefixes={view.prefixes} /> : null}
       {read(formOpen) ? <NewChangeForm /> : null}
       {errorBox}
       <Tabs label="OpenSpec views" value={read(tab)} onChange={(v) => set(tab, v)}>
-        <Tab value="changes" label={`Changes (${s.changes.length})`}>
-          <ChangesTab changes={s.changes} />
+        <Tab value="changes" label={`Changes (${changeCount})`}>
+          {filtered ? (
+            <ChangesTab changes={filtered.changes.mine} shared={filtered.changes.shared} />
+          ) : (
+            <ChangesTab changes={s.changes} />
+          )}
         </Tab>
-        <Tab value="specs" label={`Specs (${s.specs.length})`}>
-          <SpecsTab specs={s.specs} />
+        <Tab value="specs" label={`Specs (${specCount})`}>
+          {filtered ? <SpecsTab specs={filtered.specs.mine} shared={filtered.specs.shared} /> : <SpecsTab specs={s.specs} />}
         </Tab>
       </Tabs>
     </Stack>

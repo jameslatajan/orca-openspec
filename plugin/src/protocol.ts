@@ -14,6 +14,10 @@ declare module 'orca' {
     }
     /** The agent kinds the New change form offers, the default first. */
     'openspec.agents': { output: { agents: string[]; defaultAgent: string } }
+    /** The focused workspace's saved system prefixes, or null when it has none yet. */
+    'openspec.systemPrefixes': { output: { prefixes: string[] | null } }
+    /** Saves the focused workspace's system prefixes. */
+    'openspec.setSystemPrefixes': { input: { prefixes: string[] }; output: { prefixes: string[] } }
     /** Opens a terminal running `openspec init` in the focused workspace. */
     'openspec.init': { output: { terminalId: string } }
   }

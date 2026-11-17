@@ -14,6 +14,7 @@ An [Orca](https://github.com/stablyai/orca) plugin for [OpenSpec](https://github
 - **Palette commands:** `OpenSpec: New change`, `Apply change`, `Verify change`, `Archive change` and `Refresh panel`. Apply, Verify and Archive use the change selected in the panel, or the only change if there is just one.
 - **Auto-refresh:** the panel updates about 300 ms after files in `openspec/` change, when you switch workspace, and when an agent the plugin started finishes.
 - **OpenSpec stores:** if a workspace's `openspec/config.yaml` says `store: <id>`, the panel shows that store's changes and specs (from the folder `openspec store list` registers for `<id>`), labels the header "via store <id>", and watches the store for edits. Press Refresh after registering or moving a store.
+- **This system / All:** a shared store can hold many systems' items. In a store workspace, **This system** shows only the items whose name starts with your system's prefix (`eclaims-…`), then a **Shared** section for items with no common system prefix. The prefixes are guessed from the workspace name ("COLIN ECLAIMS" → `eclaims`); use **Edit system** to change them, for example `eclaims, ess`. **All** shows everything.
 - **Init OpenSpec:** in a workspace without an `openspec/` folder, a button opens a terminal running `openspec init`.
 
 ## Requirements

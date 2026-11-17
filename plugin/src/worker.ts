@@ -231,6 +231,20 @@ export default function activate(orca: OrcaWorkerApi): void {
     // Only the form's Explore and Propose pick a model.
     launch(step, change ?? description, agent, step === 'explore' || step === 'propose' ? model : undefined)
   )
+  const prefixKey = async (): Promise<string> => {
+    const ws = await focused(orca)
+    if (!ws) throw Object.assign(new Error('No workspace is focused.'), { code: 'invalid_params' })
+    return `systemPrefixes:${ws.workspaceId}`
+  }
+  orca.panels.handle('openspec.systemPrefixes', async () => {
+    const saved = await orca.storage.get(await prefixKey())
+    return { prefixes: Array.isArray(saved) ? saved.filter((p): p is string => typeof p === 'string') : null }
+  })
+  orca.panels.handle('openspec.setSystemPrefixes', async ({ prefixes }) => {
+    const clean = [...new Set(prefixes.map((p) => String(p).trim().toLowerCase()).filter(Boolean))].slice(0, 20)
+    await orca.storage.set(await prefixKey(), clean)
+    return { prefixes: clean }
+  })
   orca.panels.handle('openspec.agents', async () => {
     const preferred = await defaultAgent(orca)
     return { agents: [preferred, ...AGENTS.filter((a) => a !== preferred)], defaultAgent: preferred }

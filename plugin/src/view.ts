@@ -29,3 +29,45 @@ export function filterByName<T>(items: readonly T[], text: string, name: (item: 
 export function progressText(c: ChangeInfo): string {
   return c.total === null ? 'no tasks' : `${c.done}/${c.total}`
 }
+
+/** The system part of a change or spec name: the text before the first '-'. */
+export function prefixOf(name: string): string {
+  const i = name.indexOf('-')
+  return (i > 0 ? name.slice(0, i) : name).toLowerCase()
+}
+
+/** Prefixes shared by at least `min` names: the store's systems (doh, ess, eclaims, …). */
+export function knownPrefixes(names: readonly string[], min = 3): Set<string> {
+  const counts = new Map<string, number>()
+  for (const n of names) counts.set(prefixOf(n), (counts.get(prefixOf(n)) ?? 0) + 1)
+  return new Set([...counts].filter(([, c]) => c >= min).map(([p]) => p))
+}
+
+/** Words of a workspace name that are known prefixes ("COLIN ECLAIMS" → ["eclaims"]). */
+export function guessPrefixes(workspaceName: string, known: ReadonlySet<string>): string[] {
+  const words = workspaceName.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean)
+  return [...new Set(words.filter((w) => known.has(w)))]
+}
+
+/** Parses the editable "eclaims, ess" text into a clean prefix list. */
+export function parsePrefixes(text: string): string[] {
+  return [...new Set(text.split(/[\s,]+/).map((p) => p.trim().toLowerCase()).filter(Boolean))]
+}
+
+/** Items of this system, and shared items (no known prefix). Other systems' items are dropped. */
+export function splitBySystem<T>(
+  items: readonly T[],
+  prefixes: readonly string[],
+  known: ReadonlySet<string>,
+  nameOf: (item: T) => string
+): { mine: T[]; shared: T[] } {
+  const mineSet = new Set(prefixes.map((p) => p.toLowerCase()))
+  const mine: T[] = []
+  const shared: T[] = []
+  for (const item of items) {
+    const p = prefixOf(nameOf(item))
+    if (mineSet.has(p)) mine.push(item)
+    else if (!known.has(p)) shared.push(item)
+  }
+  return { mine, shared }
+}

@@ -42,6 +42,10 @@ The authoritative plugin API reference ships with the CLI. Read it instead of gu
   - a debounced recursive `fs.watch` on `openspec/` (`src/watch.ts`).
   `retarget()` keeps one module-level watcher and skips a retarget when the path is unchanged; `deactivate()` closes it.
 - **Stores:** `src/store.ts` reads a top-level `store: <id>` from the workspace's `openspec/config.yaml`, then resolves it with `openspec store list --json`. The listing is cached; only the Refresh button and the palette Refresh clear it, because `workspace.changed` fires on every terminal open or close. `dataRootOf()` returns the store root or the workspace, and both reading and watching use it. Tests inject `options.storeRunner`.
+- **System filter (store workspaces):** OpenSpec records no project membership, so the panel filters by name prefix.
+  - `view.ts`: `prefixOf`, `knownPrefixes` (a prefix shared by ≥3 items), `guessPrefixes` (from the workspace name) and `splitBySystem` (into `mine` and `shared`; other systems are dropped).
+  - The worker stores each workspace's list under `systemPrefixes:<workspaceId>`.
+  - `systemMode` (`persist: 'plugin'`) switches between This system and All.
 - **Selected change** is a `persist: 'storage'` atom (`selectedChange`), so the worker's palette commands read the same value from `orca.storage`.
 - **Worker state:** a worker save restarts it and drops in-memory state. Anything that must survive goes in `orca.storage`.
 

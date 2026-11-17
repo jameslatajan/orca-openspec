@@ -256,3 +256,80 @@ test('a failed Refresh shows the error', async () => {
   assert.ok(view.find({ label: 'Refresh' }))
   await view.unmount()
 })
+
+const storeState: OpenSpecState = {
+  status: 'ok',
+  workspace: 'COLIN ECLAIMS',
+  store: 'isotech',
+  changes: [
+    { name: 'eclaims-import', done: 1, total: 4 },
+    { name: 'eclaims-fallback', done: 2, total: 4 },
+    { name: 'ess-ldna-print', done: 8, total: 10 },
+    { name: 'ess-sso', done: 0, total: 7 },
+    { name: 'access-control-fix', done: 0, total: 2 }
+  ],
+  specs: ['eclaims-claims', 'ess-leave', 'ess-payslip', 'eclaims-batch', 'access-control', 'doh-report']
+}
+
+function storeHost(saved: string[] | null = null) {
+  let prefixes = saved
+  const saves: string[][] = []
+  const host = mockHost({
+    requests: {
+      'openspec.state': storeState,
+      'openspec.systemPrefixes': () => ({ prefixes }),
+      'openspec.setSystemPrefixes': ({ prefixes: next }) => (saves.push(next), (prefixes = next), { prefixes: next })
+    }
+  })
+  return { host, saves }
+}
+
+test('store workspace: This system shows its items plus Shared, hides other systems', async () => {
+  const { host } = storeHost()
+  const view = await mount(panel, { host })
+  await view.press({ text: 'This system' })
+  assert.ok(view.find({ text: /System: eclaims/ }))
+  assert.ok(view.find({ text: /Changes \(3\)/ }))
+  assert.ok(view.find({ label: 'eclaims-import' }))
+  assert.ok(view.find({ label: 'access-control-fix' })) // shared
+  assert.ok(view.find({ text: 'Shared' }))
+  assert.equal(view.find({ label: 'ess-ldna-print' }), null)
+
+  await view.press({ text: 'All' })
+  assert.ok(view.find({ text: /Changes \(5\)/ }))
+  assert.ok(view.find({ label: 'ess-ldna-print' }))
+  assert.equal(view.find({ text: 'Shared' }), null)
+  await view.press({ text: 'This system' })
+  await view.unmount()
+})
+
+test('store workspace: editing the system saves it and widens the list', async () => {
+  const { host, saves } = storeHost()
+  const view = await mount(panel, { host })
+  await view.press({ text: 'This system' })
+  await view.press({ text: 'Edit system' })
+  await view.type({ label: 'System prefixes' }, 'eclaims, ess', { replace: true })
+  await view.press({ text: 'Save' })
+  assert.deepEqual(saves, [['eclaims', 'ess']])
+  assert.ok(view.find({ text: /System: eclaims, ess/ }))
+  assert.ok(view.find({ label: 'ess-ldna-print' }))
+  assert.ok(view.find({ text: /Changes \(5\)/ }))
+  await view.unmount()
+})
+
+test('store workspace: a saved system wins over the guess', async () => {
+  const { host } = storeHost(['ess'])
+  const view = await mount(panel, { host })
+  await view.press({ text: 'This system' })
+  assert.ok(view.find({ text: /System: ess/ }))
+  assert.ok(view.find({ label: 'ess-sso' }))
+  assert.equal(view.find({ label: 'eclaims-import' }), null)
+  await view.unmount()
+})
+
+test('local workspaces show no system bar', async () => {
+  const { host } = setupHost()
+  const view = await mount(panel, { host })
+  assert.equal(view.find({ text: 'This system' }), null)
+  await view.unmount()
+})

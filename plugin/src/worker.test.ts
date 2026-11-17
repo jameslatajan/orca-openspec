@@ -288,3 +288,15 @@ test('watches the store folder: a store edit refreshes the panel', async () => {
   main.options.watchDelayMs = 300
   clearStoreCache()
 })
+
+test('saves and returns system prefixes per workspace', async () => {
+  const h = host(fixture())
+  const worker = await mountWorker(main, { host: h })
+  assert.deepEqual(await worker.request('openspec.systemPrefixes'), { prefixes: null })
+  assert.deepEqual(await worker.request('openspec.setSystemPrefixes', { prefixes: [' Eclaims', 'ess', 'ess', ''] }), {
+    prefixes: ['eclaims', 'ess']
+  })
+  assert.deepEqual(await worker.request('openspec.systemPrefixes'), { prefixes: ['eclaims', 'ess'] })
+  assert.deepEqual(h.data().storage['systemPrefixes:w1'], ['eclaims', 'ess'])
+  await worker.deactivate()
+})
