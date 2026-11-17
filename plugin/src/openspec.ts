@@ -1,0 +1,59 @@
+// Reads an openspec/ folder from disk. Pure Node, no Orca APIs, so it is unit-tested directly.
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
+import { join } from 'node:path'
+import type { ChangeInfo } from './protocol'
+
+const DONE = /^\s*[-*]\s+\[\s*[xX]\s*\]/
+const BOX = /^\s*[-*]\s+\[[^\]]*\]/
+
+/** Counts checked/total task boxes; a box holding only x (any case, any spacing) is done. */
+export function countTasks(text: string): { done: number; total: number } {
+  let done = 0
+  let total = 0
+  for (const line of text.split(/\r?\n/)) {
+    if (!BOX.test(line)) continue
+    total++
+    if (DONE.test(line)) done++
+  }
+  return { done, total }
+}
+
+function dirs(path: string): string[] {
+  return readdirSync(path, { withFileTypes: true })
+    .filter((e) => e.isDirectory())
+    .map((e) => e.name)
+    .sort()
+}
+
+export function hasOpenSpec(root: string): boolean {
+  const dir = join(root, 'openspec')
+  return existsSync(dir) && statSync(dir).isDirectory()
+}
+
+export function readChanges(root: string): ChangeInfo[] {
+  const base = join(root, 'openspec', 'changes')
+  if (!existsSync(base)) return []
+  return dirs(base)
+    .filter((name) => name !== 'archive')
+    .map((name) => {
+      const tasks = join(base, name, 'tasks.md')
+      if (!existsSync(tasks)) return { name, done: 0, total: null }
+      return { name, ...countTasks(readFileSync(tasks, 'utf8')) }
+    })
+}
+
+/** Capability paths with a spec.md, nested ones included (`billing/invoices`). */
+export function readSpecs(root: string): string[] {
+  const base = join(root, 'openspec', 'specs')
+  const out: string[] = []
+  const walk = (dir: string, prefix: string): void => {
+    if (!existsSync(dir)) return
+    for (const name of dirs(dir)) {
+      const rel = prefix ? `${prefix}/${name}` : name
+      if (existsSync(join(dir, name, 'spec.md'))) out.push(rel)
+      walk(join(dir, name), rel)
+    }
+  }
+  walk(base, '')
+  return out
+}

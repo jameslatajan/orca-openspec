@@ -1,0 +1,50 @@
+{
+  "manifestVersion": 2,
+  "id": "openspec",
+  "name": "OpenSpec",
+  "version": "0.1.0",
+  "description": "See a workspace's OpenSpec changes and specs, and launch /opsx propose, apply, verify and archive agents.",
+  "engines": {
+    "orca": ">=1.4.248"
+  },
+  "execution": "trusted-worker",
+  "pluginApi": 1,
+  "main": "src/worker.ts",
+  "contributes": {
+    "panels": [
+      {
+        "id": "openspec",
+        "title": "OpenSpec",
+        "icon": "book",
+        "entry": "src/panel.tsx",
+        "ui": "components"
+      }
+    ],
+    "commands": [
+      { "id": "openspec.propose", "title": "OpenSpec: New change", "when": "workspace" },
+      { "id": "openspec.apply", "title": "OpenSpec: Apply change", "when": "workspace" },
+      { "id": "openspec.verify", "title": "OpenSpec: Verify change", "when": "workspace" },
+      { "id": "openspec.archive", "title": "OpenSpec: Archive change", "when": "workspace" },
+      { "id": "openspec.refresh", "title": "OpenSpec: Refresh panel", "when": "workspace" }
+    ],
+    "events": [{ "on": "workspace.changed" }, { "on": "agent.status.changed" }],
+    "settings": [
+      {
+        "key": "agent",
+        "title": "Agent",
+        "description": "Agent CLI launched for /opsx commands.",
+        "type": "string",
+        "default": "claude"
+      }
+    ]
+  },
+  "capabilities": [
+    { "kind": "storage:own" },
+    { "kind": "settings:own" },
+    { "kind": "workspace:read" },
+    { "kind": "agent:read" },
+    { "kind": "agent:launch" },
+    { "kind": "terminal:send" },
+    { "kind": "notifications:show" }
+  ]
+}
