@@ -13,6 +13,7 @@ An [Orca](https://github.com/stablyai/orca) plugin for [OpenSpec](https://github
   - Apply, Verify and Archive start an agent in the current workspace with the matching OpenSpec command for the change: `/openspec-apply-change <change>`, `/openspec-verify-change <change>` or `/openspec-archive-change <change>`. If your agent has `/opsx:*` commands instead, set **Command style** to OPSX.
 - **Palette commands:** `OpenSpec: New change`, `Apply change`, `Verify change`, `Archive change` and `Refresh panel`. Apply, Verify and Archive use the change selected in the panel, or the only change if there is just one.
 - **Auto-refresh:** the panel updates about 300 ms after files in `openspec/` change, when you switch workspace, and when an agent the plugin started finishes.
+- **OpenSpec stores:** if a workspace's `openspec/config.yaml` says `store: <id>`, the panel shows that store's changes and specs (from the folder `openspec store list` registers for `<id>`), labels the header "via store <id>", and watches the store for edits. Press Refresh after registering or moving a store.
 - **Init OpenSpec:** in a workspace without an `openspec/` folder, a button opens a terminal running `openspec init`.
 
 ## Requirements
@@ -57,7 +58,6 @@ The plugin runs a Node worker with your user account's access. It asks for:
 
 - Every agent gets the same slash command. Agents other than Claude Code may name or invoke OpenSpec commands differently.
 - Remote and SSH workspaces are not supported yet; the panel says so.
-- OpenSpec stores (`--store`) are not read; only the workspace's own `openspec/` folder is.
 
 ## Develop
 

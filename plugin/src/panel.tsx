@@ -1,6 +1,7 @@
 // No build step: Orca strips the types and compiles the JSX when the panel loads.
 import {
   atom,
+  Badge,
   Box,
   Button,
   Callout,
@@ -45,6 +46,10 @@ const CHIPS: { value: Chip; label: string }[] = [
 
 async function load(): Promise<void> {
   set(state, await plugin.request('openspec.state'))
+}
+
+async function reload(): Promise<void> {
+  set(state, await plugin.request('openspec.refresh'))
 }
 
 async function call(fn: () => Promise<unknown>): Promise<void> {
@@ -185,10 +190,13 @@ export function setup(ctx: PanelContext): void {
   void load()
 }
 
-function Header(props: { title: string; canCreate: boolean }) {
+function Header(props: { title: string; canCreate: boolean; store?: string }) {
   return (
     <Row justify="between">
-      <Heading>{props.title}</Heading>
+      <Row gap="xs">
+        <Heading>{props.title}</Heading>
+        {props.store ? <Badge tone="accent">via store {props.store}</Badge> : null}
+      </Row>
       <Row gap="xs">
         {props.canCreate ? (
           <IconButton
@@ -199,7 +207,7 @@ function Header(props: { title: string; canCreate: boolean }) {
             onPress={() => (read(formOpen) ? closeForm() : openForm())}
           />
         ) : null}
-        <IconButton icon="refresh" label="Refresh" variant="ghost" onPress={load} />
+        <IconButton icon="refresh" label="Refresh" variant="ghost" onPress={reload} />
       </Row>
     </Row>
   )
@@ -327,21 +335,21 @@ export default function Panel() {
   if (s.status === 'remote')
     return (
       <Stack gap="md">
-        <Header title={title} canCreate={false} />
+        <Header title={title} canCreate={false} store={s.store} />
         <EmptyState title="Remote workspace" description="Remote workspaces are not supported yet." />
       </Stack>
     )
   if (s.status === 'error')
     return (
       <Stack gap="md">
-        <Header title={title} canCreate={false} />
+        <Header title={title} canCreate={false} store={s.store} />
         <Callout tone="danger">Could not read OpenSpec: {s.error}</Callout>
       </Stack>
     )
   if (s.status === 'no-openspec')
     return (
       <Stack gap="md">
-        <Header title={title} canCreate={false} />
+        <Header title={title} canCreate={false} store={s.store} />
         <EmptyState title="OpenSpec is not set up" description="This workspace has no openspec/ folder.">
           <Button onPress={init}>Init OpenSpec</Button>
         </EmptyState>
@@ -351,7 +359,7 @@ export default function Panel() {
 
   return (
     <Stack gap="md">
-      <Header title={title} canCreate />
+      <Header title={title} canCreate store={s.store} />
       {read(formOpen) ? <NewChangeForm /> : null}
       {errorBox}
       <Tabs label="OpenSpec views" value={read(tab)} onChange={(v) => set(tab, v)}>

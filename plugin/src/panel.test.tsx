@@ -213,3 +213,10 @@ test('Model picker shows only for claude and is sent with Explore', async () => 
   assert.deepEqual(launches, [{ step: 'explore', description: 'add dark mode', agent: 'claude', model: 'sonnet' }])
   await view.unmount()
 })
+
+test('shows a "via store" badge for store workspaces', async () => {
+  const { host } = setupHost({ 'openspec.state': { ...ok, store: 'isotech' } })
+  const view = await mount(panel, { host })
+  assert.ok(view.find({ text: 'via store isotech' }))
+  await view.unmount()
+})

@@ -224,3 +224,67 @@ test('sends no /model for the default, other agents, bad values or Apply', async
   assert.equal(main.modelCommand('claude', ''), null)
   await worker.deactivate()
 })
+
+function storeFixture(): { workspace: string; store: string } {
+  const store = fixture() // a store is an ordinary folder with openspec/
+  const workspace = mkdtempSync(join(tmpdir(), 'linked-'))
+  mkdirSync(join(workspace, 'openspec'), { recursive: true })
+  writeFileSync(join(workspace, 'openspec', 'config.yaml'), 'store: isotech\n')
+  return { workspace, store }
+}
+
+const storeRunner = (store: string) => async () => JSON.stringify({ stores: [{ id: 'isotech', root: store }] })
+
+test('reads changes and specs from the store a workspace points to', async () => {
+  const { workspace, store } = storeFixture()
+  const { clearStoreCache } = await import('./store')
+  clearStoreCache()
+  main.options.storeRunner = storeRunner(store)
+  const worker = await mountWorker(main, { host: host(workspace) })
+  const state = (await worker.request('openspec.state')) as {
+    status: string
+    store?: string
+    changes: { name: string }[]
+    specs: string[]
+  }
+  assert.equal(state.status, 'ok')
+  assert.equal(state.store, 'isotech')
+  assert.deepEqual(state.changes.map((c) => c.name), ['add-auth', 'no-tasks'])
+  assert.deepEqual(state.specs, ['auth', 'billing/invoices'])
+  await worker.deactivate()
+})
+
+test('reports an unknown store as an error with the fix', async () => {
+  const { workspace } = storeFixture()
+  const { clearStoreCache } = await import('./store')
+  clearStoreCache()
+  main.options.storeRunner = async () => JSON.stringify({ stores: [] })
+  const worker = await mountWorker(main, { host: host(workspace) })
+  const state = (await worker.request('openspec.state')) as { status: string; error?: string }
+  assert.equal(state.status, 'error')
+  assert.match(state.error ?? '', /Store "isotech" is not registered/)
+  await worker.deactivate()
+  clearStoreCache()
+})
+
+test('watches the store folder: a store edit refreshes the panel', async () => {
+  const { workspace, store } = storeFixture()
+  const { clearStoreCache } = await import('./store')
+  clearStoreCache()
+  main.options.storeRunner = storeRunner(store)
+  main.options.watchDelayMs = 100
+  const worker = await mountWorker(main, { host: host(workspace) })
+  await worker.request('openspec.state') // starts the watcher on the store
+  await wait(300)
+  const before = worker.posts.length
+  writeFileSync(join(store, 'openspec/changes/add-auth/tasks.md'), '- [x] a\n- [x] b\n')
+  await wait(600)
+  const posts = worker.posts.slice(before).filter((p) => p.event === 'openspec.changed')
+  assert.equal(posts.length, 1)
+  const state = posts[0].payload as { store?: string; changes: { name: string; done: number; total: number }[] }
+  assert.equal(state.store, 'isotech')
+  assert.deepEqual(state.changes[0], { name: 'add-auth', done: 2, total: 2 })
+  await worker.deactivate()
+  main.options.watchDelayMs = 300
+  clearStoreCache()
+})

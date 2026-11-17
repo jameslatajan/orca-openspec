@@ -3,12 +3,18 @@ import type { OrcaWorkerApi } from 'orca/worker'
 import { hasOpenSpec, readChanges, readSpecs } from './openspec'
 import type { OpenSpecState, OpsxStep } from './protocol'
 import { watchFolder, type FolderWatch } from './watch'
+import { clearStoreCache, resolveStore, runOpenSpecStoreList, workspaceStoreId, type StoreListRunner } from './store'
 import { join } from 'node:path'
 
 /** The live watcher on the focused workspace's openspec/ folder, if any. */
 let current: FolderWatch | null = null
 /** Timings; tests shorten them. */
-export const options = { watchDelayMs: 300, readyPollMs: 500, readyTimeoutMs: 30_000 }
+export const options: {
+  watchDelayMs: number
+  readyPollMs: number
+  readyTimeoutMs: number
+  storeRunner: StoreListRunner
+} = { watchDelayMs: 300, readyPollMs: 500, readyTimeoutMs: 30_000, storeRunner: runOpenSpecStoreList }
 
 /** Agent kinds the New change form offers. */
 export const AGENTS = ['claude', 'codex', 'gemini', 'opencode', 'cursor', 'copilot']
@@ -44,16 +50,28 @@ async function focused(orca: OrcaWorkerApi): Promise<Focus | null> {
   return { workspaceId: row.id, path: row.path, hostId: row.hostId, name: ctx.displayName }
 }
 
+/** Where a workspace's OpenSpec data lives: the workspace itself, or the store its config names. */
+export async function dataRootOf(workspacePath: string): Promise<{ root: string; store?: string }> {
+  const store = workspaceStoreId(workspacePath)
+  if (!store) return { root: workspacePath }
+  return { root: await resolveStore(store, options.storeRunner), store }
+}
+
 export async function readState(orca: OrcaWorkerApi): Promise<OpenSpecState> {
   const empty = { changes: [], specs: [] }
+  let workspace: string | undefined
   try {
     const ws = await focused(orca)
     if (!ws) return { status: 'no-workspace', ...empty }
-    if (ws.hostId && ws.hostId !== 'local') return { status: 'remote', workspace: ws.name, ...empty }
-    if (!hasOpenSpec(ws.path)) return { status: 'no-openspec', workspace: ws.name, ...empty }
-    return { status: 'ok', workspace: ws.name, changes: readChanges(ws.path), specs: readSpecs(ws.path) }
+    workspace = ws.name
+    if (ws.hostId && ws.hostId !== 'local') return { status: 'remote', workspace, ...empty }
+    if (!hasOpenSpec(ws.path)) return { status: 'no-openspec', workspace, ...empty }
+    const { root, store } = await dataRootOf(ws.path)
+    const where = store ? { workspace, store } : { workspace }
+    if (!hasOpenSpec(root)) return { status: 'no-openspec', ...where, ...empty }
+    return { status: 'ok', ...where, changes: readChanges(root), specs: readSpecs(root) }
   } catch (err) {
-    return { status: 'error', ...empty, error: err instanceof Error ? err.message : String(err) }
+    return { status: 'error', workspace, ...empty, error: err instanceof Error ? err.message : String(err) }
   }
 }
 
@@ -156,7 +174,8 @@ export default function activate(orca: OrcaWorkerApi): void {
     try {
       const ws = await focused(orca)
       if (ws && (!ws.hostId || ws.hostId === 'local') && hasOpenSpec(ws.path)) {
-        target = join(ws.path, 'openspec')
+        const { root } = await dataRootOf(ws.path)
+        if (hasOpenSpec(root)) target = join(root, 'openspec')
       }
     } catch {
       target = null
@@ -199,6 +218,11 @@ export default function activate(orca: OrcaWorkerApi): void {
     return { terminalId }
   }
 
+  orca.panels.handle('openspec.refresh', async () => {
+    clearStoreCache()
+    await retarget()
+    return readState(orca)
+  })
   orca.panels.handle('openspec.state', async () => {
     await retarget()
     return readState(orca)
@@ -256,6 +280,7 @@ export default function activate(orca: OrcaWorkerApi): void {
     })
   }
   orca.commands.register('openspec.refresh', async () => {
+    clearStoreCache() // an explicit refresh picks up stores registered or moved since the last look
     await refresh()
     return 'Refreshed'
   })

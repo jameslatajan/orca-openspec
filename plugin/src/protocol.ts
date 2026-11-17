@@ -5,6 +5,8 @@ declare module 'orca' {
   interface PluginRequests {
     /** OpenSpec state of the focused workspace. */
     'openspec.state': { output: OpenSpecState }
+    /** Like `openspec.state`, but first forgets the cached store list (the Refresh button). */
+    'openspec.refresh': { output: OpenSpecState }
     /** Launches an agent in the focused workspace and types the OpenSpec command for `step`. */
     'openspec.launch': {
       input: { step: OpsxStep; change?: string; description?: string; agent?: string; model?: string }
@@ -30,6 +32,8 @@ export type ChangeInfo = { name: string; done: number; total: number | null }
 export type OpenSpecState = {
   status: 'no-workspace' | 'no-openspec' | 'remote' | 'ok' | 'error'
   workspace?: string
+  /** The OpenSpec store this workspace's config points to, when it uses one. */
+  store?: string
   changes: ChangeInfo[]
   specs: string[]
   error?: string
