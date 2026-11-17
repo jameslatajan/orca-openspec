@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { assert, mockHost, mountWorker, test } from 'orca/testing'
 import { countTasks, readChanges, readSpecs } from './openspec'
+import { watchFolder } from './watch'
 import * as main from './worker'
 
 function fixture(): string {
@@ -59,6 +60,37 @@ test('answers state and launches /opsx agents', async () => {
   ])
   assert.deepEqual(worker.refusals, [])
   await worker.deactivate()
+})
+
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+test('watchFolder calls onChange once per burst of writes', async () => {
+  const root = fixture()
+  let calls = 0
+  const w = watchFolder(join(root, 'openspec'), () => calls++, () => {}, 100)
+  const tasks = join(root, 'openspec/changes/add-auth/tasks.md')
+  for (let i = 0; i < 5; i++) writeFileSync(tasks, `- [x] a\n- [ ] b${i}\n`)
+  await wait(500)
+  w.close()
+  assert.equal(calls, 1)
+})
+
+test('posts fresh state once when a task is ticked on disk', async () => {
+  const root = fixture()
+  main.options.watchDelayMs = 100
+  const worker = await mountWorker(main, { host: host(root) })
+  await worker.request('openspec.state') // starts the watcher
+  await wait(300) // let the initial watch and any startup events settle
+  const before = worker.posts.length
+  const tasks = join(root, 'openspec/changes/add-auth/tasks.md')
+  writeFileSync(tasks, '- [x] a\n- [x] b\n- [x] c\n- [x] d\n- [~] e\n')
+  await wait(600)
+  const posts = worker.posts.slice(before).filter((p) => p.event === 'openspec.changed')
+  assert.equal(posts.length, 1)
+  const state = posts[0].payload as { changes: { name: string; done: number; total: number }[] }
+  assert.deepEqual(state.changes[0], { name: 'add-auth', done: 4, total: 5 })
+  await worker.deactivate()
+  main.options.watchDelayMs = 300
 })
 
 test('reports no-openspec for a bare folder and inits it', async () => {

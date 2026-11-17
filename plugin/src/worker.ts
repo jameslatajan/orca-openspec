@@ -2,6 +2,22 @@
 import type { OrcaWorkerApi } from 'orca/worker'
 import { hasOpenSpec, readChanges, readSpecs } from './openspec'
 import type { OpenSpecState, OpsxStep } from './protocol'
+import { watchFolder, type FolderWatch } from './watch'
+import { join } from 'node:path'
+
+/** The live watcher on the focused workspace's openspec/ folder, if any. */
+let current: FolderWatch | null = null
+/** Debounce for file events; tests shorten it. */
+export const options = { watchDelayMs: 300 }
+
+function stopWatching(): void {
+  current?.close()
+  current = null
+}
+
+export function deactivate(): void {
+  stopWatching()
+}
 
 const SELECTED = 'selectedChange'
 
@@ -37,10 +53,44 @@ export default function activate(orca: OrcaWorkerApi): void {
   /** Terminals of agents this plugin launched; their `done` triggers a refresh. */
   const launched = new Set<string>()
 
-  const refresh = async (): Promise<OpenSpecState> => {
+  const post = async (): Promise<OpenSpecState> => {
     const state = await readState(orca)
     orca.panels.post('openspec.changed', state)
     return state
+  }
+
+  /** Watch the focused local workspace's openspec/ folder; no-op when it is already watched. */
+  const retarget = async (): Promise<void> => {
+    let target: string | null = null
+    try {
+      const ws = await focused(orca)
+      if (ws && (!ws.hostId || ws.hostId === 'local') && hasOpenSpec(ws.path)) {
+        target = join(ws.path, 'openspec')
+      }
+    } catch {
+      target = null
+    }
+    if (current?.path === target) return
+    stopWatching()
+    if (!target) return
+    try {
+      current = watchFolder(
+        target,
+        () => void post(),
+        (err) => {
+          current = null
+          orca.log(`openspec watch stopped: ${err.message}`)
+        },
+        options.watchDelayMs
+      )
+    } catch (err) {
+      orca.log(`openspec watch failed: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
+
+  const refresh = async (): Promise<OpenSpecState> => {
+    await retarget()
+    return post()
   }
 
   const launch = async (step: OpsxStep, change?: string): Promise<{ terminalId: string }> => {
@@ -57,7 +107,10 @@ export default function activate(orca: OrcaWorkerApi): void {
     return { terminalId }
   }
 
-  orca.panels.handle('openspec.state', () => readState(orca))
+  orca.panels.handle('openspec.state', async () => {
+    await retarget()
+    return readState(orca)
+  })
   orca.panels.handle('openspec.launch', ({ step, change }) => launch(step, change))
   orca.panels.handle('openspec.init', async () => {
     const ws = await focused(orca)
