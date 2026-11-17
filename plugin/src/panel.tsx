@@ -13,6 +13,7 @@ import {
   ListItem,
   plugin,
   Progress,
+  RelativeTime,
   read,
   Row,
   Select,
@@ -44,12 +45,36 @@ const CHIPS: { value: Chip; label: string }[] = [
   { value: 'done', label: 'Done' }
 ]
 
+/** True while the Refresh button's reload runs (shown as a spinner). */
+const refreshing = atom(false)
+/** When the panel last got fresh state, for the "Updated …" line. */
+const updatedAt = atom<number | null>(null)
+/** The spinner stays at least this long, so a fast refresh is still visible. */
+export const MIN_SPIN_MS = 500
+
+function receive(next: OpenSpecState): void {
+  set(state, next)
+  set(updatedAt, Date.now())
+}
+
 async function load(): Promise<void> {
-  set(state, await plugin.request('openspec.state'))
+  receive(await plugin.request('openspec.state'))
 }
 
 async function reload(): Promise<void> {
-  set(state, await plugin.request('openspec.refresh'))
+  if (read(refreshing)) return
+  set(refreshing, true)
+  set(actionError, null)
+  const minimum = new Promise((r) => setTimeout(r, MIN_SPIN_MS))
+  try {
+    const [next] = await Promise.all([plugin.request('openspec.refresh'), minimum])
+    receive(next)
+  } catch (err) {
+    await minimum
+    set(actionError, `Refresh failed: ${err instanceof Error ? err.message : String(err)}`)
+  } finally {
+    set(refreshing, false)
+  }
 }
 
 async function call(fn: () => Promise<unknown>): Promise<void> {
@@ -185,9 +210,18 @@ const clearFilters = () => {
 }
 
 export function setup(ctx: PanelContext): void {
-  ctx.subscriptions.push(plugin.on('openspec.changed', (payload) => set(state, payload)))
+  ctx.subscriptions.push(plugin.on('openspec.changed', (payload) => receive(payload)))
   ctx.subscriptions.push(plugin.on('openspec.showForm', () => void openForm()))
   void load()
+}
+
+function UpdatedLine() {
+  const at = read(updatedAt)
+  return at === null ? null : (
+    <Text muted size="xs">
+      Updated <RelativeTime at={at} muted />
+    </Text>
+  )
 }
 
 function Header(props: { title: string; canCreate: boolean; store?: string }) {
@@ -207,7 +241,11 @@ function Header(props: { title: string; canCreate: boolean; store?: string }) {
             onPress={() => (read(formOpen) ? closeForm() : openForm())}
           />
         ) : null}
-        <IconButton icon="refresh" label="Refresh" variant="ghost" onPress={reload} />
+        {read(refreshing) ? (
+          <Spinner label="Refreshing" labelHidden />
+        ) : (
+          <IconButton icon="refresh" label="Refresh" variant="ghost" onPress={reload} />
+        )}
       </Row>
     </Row>
   )
@@ -360,6 +398,7 @@ export default function Panel() {
   return (
     <Stack gap="md">
       <Header title={title} canCreate store={s.store} />
+      <UpdatedLine />
       {read(formOpen) ? <NewChangeForm /> : null}
       {errorBox}
       <Tabs label="OpenSpec views" value={read(tab)} onChange={(v) => set(tab, v)}>

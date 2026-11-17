@@ -50,6 +50,7 @@ The authoritative plugin API reference ships with the CLI. Read it instead of gu
 - `engines.orca` must be ≥ the newest `Since` of anything used. It is `>=1.4.248` because a capability requires it, and `plugin check` fails if it is lower.
 - Adding a capability, command or event changes the approval fingerprint. The user must re-approve the plugin (`orca plugin dev load ./plugin --approve <fingerprint>`), so never approve on their behalf. Code-only edits reload without approval.
 - `<Progress value>` is 0–100, not 0–1.
+- After a panel test waits on a timer (for example the Refresh spinner's 500 ms minimum), call `await view.settled()` before `find`; otherwise the view still shows the old render.
 - A `<Select>` option with value `''` makes the Select silently not render; use a real value such as `'default'`.
 - Unkeyed form atoms live at module level, so they carry over between panel tests. Set the agent explicitly in a test instead of relying on the default.
 - Never pass `prompt` to `agent.launch`. In practice the agent starts as an *orphaned* background terminal (no pane; check with `orca terminal list --worktree <id>`) and the prompt never arrives. `launchVisible()` launches without a prompt, calls `terminal.focus`, polls `terminal.read` until `isAgentReady()` sees an input marker (`❯`, `>`, `›`) on a stable screen, then calls `terminal.sendText`. Timings live in `options`, so tests shorten them.

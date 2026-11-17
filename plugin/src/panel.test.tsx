@@ -220,3 +220,39 @@ test('shows a "via store" badge for store workspaces', async () => {
   assert.ok(view.find({ text: 'via store isotech' }))
   await view.unmount()
 })
+
+test('Refresh shows a spinner, then the updated time', async () => {
+  let finish: (v: OpenSpecState) => void = () => {}
+  const { host } = setupHost({
+    'openspec.refresh': () => new Promise<OpenSpecState>((r) => (finish = r))
+  })
+  const view = await mount(panel, { host })
+  assert.ok(view.find({ text: /^Updated/ }))
+  const pressing = view.press({ label: 'Refresh' })
+  await new Promise((r) => setTimeout(r, 50))
+  assert.ok(view.find({ label: 'Refreshing' }), 'spinner while refreshing')
+  assert.equal(view.find({ label: 'Refresh' }), null)
+  finish(ok)
+  await pressing
+  await new Promise((r) => setTimeout(r, panel.MIN_SPIN_MS + 100))
+  await view.settled()
+  assert.equal(view.find({ label: 'Refreshing' }), null)
+  assert.ok(view.find({ label: 'Refresh' }))
+  assert.deepEqual(view.errors, [])
+  await view.unmount()
+})
+
+test('a failed Refresh shows the error', async () => {
+  const { host } = setupHost({
+    'openspec.refresh': () => {
+      throw new Error('store list timed out')
+    }
+  })
+  const view = await mount(panel, { host })
+  await view.press({ label: 'Refresh' })
+  await new Promise((r) => setTimeout(r, panel.MIN_SPIN_MS + 100))
+  await view.settled()
+  assert.ok(view.find({ text: /Refresh failed: store list timed out/ }))
+  assert.ok(view.find({ label: 'Refresh' }))
+  await view.unmount()
+})
