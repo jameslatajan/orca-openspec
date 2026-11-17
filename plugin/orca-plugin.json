@@ -15,7 +15,7 @@
       {
         "id": "openspec",
         "title": "OpenSpec",
-        "icon": "book",
+        "icon": "flag",
         "entry": "src/panel.tsx",
         "ui": "components"
       }
