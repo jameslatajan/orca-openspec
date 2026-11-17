@@ -32,9 +32,18 @@
       {
         "key": "agent",
         "title": "Agent",
-        "description": "Agent CLI launched for /opsx commands.",
+        "description": "Agent CLI launched for OpenSpec commands.",
         "type": "string",
         "default": "claude"
+      },
+      {
+        "key": "commandStyle",
+        "title": "Command style",
+        "description": "How the agent is told to run each OpenSpec step. Use OPSX only if your agent has /opsx:* commands.",
+        "type": "string",
+        "default": "skill",
+        "enum": ["skill", "opsx"],
+        "enumLabels": ["Skill commands (/openspec-apply-change …)", "OPSX commands (/opsx:apply …)"]
       }
     ]
   },

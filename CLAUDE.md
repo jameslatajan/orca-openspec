@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-An Orca plugin (`plugin/`) that adds an OpenSpec sidebar panel: active changes with task progress, specs, and buttons/palette commands that launch agents with `/opsx:propose|apply|verify|archive`. The repo also tracks its own development with OpenSpec (`openspec/`).
+An Orca plugin (`plugin/`) that adds an OpenSpec sidebar panel: active changes with task progress, specs, and buttons/palette commands that launch agents with the OpenSpec commands (`/openspec-propose`, `/openspec-apply-change`, …, or `/opsx:*` via the Command style setting). The repo also tracks its own development with OpenSpec (`openspec/`).
 
 ## Commands
 
@@ -49,6 +49,7 @@ The authoritative plugin API reference ships with the CLI. Read it instead of gu
 - `engines.orca` must be ≥ the newest `Since` of anything used. It is `>=1.4.248` because a capability requires it, and `plugin check` fails if it is lower.
 - Adding a capability, command or event changes the approval fingerprint. The user must re-approve the plugin (`orca plugin dev load ./plugin --approve <fingerprint>`), so never approve on their behalf. Code-only edits reload without approval.
 - `<Progress value>` is 0–100, not 0–1.
+- Agent prompts come from `promptFor()` in `worker.ts` and follow the `commandStyle` setting. The default `skill` sends `/openspec-apply-change <change>` and so on. Bare `/opsx:*` commands don't exist on a default install: the agent opens and silently does nothing.
 - Panel-only UI state (tab, filters, chip) uses `persist: 'plugin'`. With `persist: 'storage'`, a controlled `Input` or a chip loses input to the storage echo: typing "AUTH" kept "A". Reserve `'storage'` for values the worker reads, such as `selectedChange`.
 - Status and filter logic lives in `src/view.ts` (pure functions). Keep `panel.tsx` declarative.
 - In panel tests, `view.find({ text })` matches the whole element text exactly, so use a RegExp for partial matches. Don't send `undefined` fields in request payloads, because `deepEqual` sees them.

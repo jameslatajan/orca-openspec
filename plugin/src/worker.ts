@@ -45,8 +45,23 @@ export async function readState(orca: OrcaWorkerApi): Promise<OpenSpecState> {
   }
 }
 
-export function opsxPrompt(step: OpsxStep, change?: string): string {
-  return change ? `/opsx:${step} ${change}` : `/opsx:${step}`
+export type CommandStyle = 'skill' | 'opsx'
+
+/** OpenSpec skill command names, as `openspec init` installs them for Claude Code. */
+const SKILLS: Record<OpsxStep, string> = {
+  propose: 'openspec-propose',
+  apply: 'openspec-apply-change',
+  verify: 'openspec-verify-change',
+  archive: 'openspec-archive-change'
+}
+
+export function commandStyleOf(value: unknown): CommandStyle {
+  return value === 'opsx' ? 'opsx' : 'skill'
+}
+
+export function promptFor(step: OpsxStep, change: string | undefined, style: CommandStyle): string {
+  const command = style === 'opsx' ? `/opsx:${step}` : `/${SKILLS[step]}`
+  return change ? `${command} ${change}` : command
 }
 
 export default function activate(orca: OrcaWorkerApi): void {
@@ -98,10 +113,11 @@ export default function activate(orca: OrcaWorkerApi): void {
     if (!ws) throw Object.assign(new Error('No workspace is focused.'), { code: 'invalid_params' })
     const setting = await orca.settings.get('agent')
     const agent = typeof setting === 'string' && setting ? setting : 'claude'
+    const style = commandStyleOf(await orca.settings.get('commandStyle'))
     const { terminalId } = await orca.host.call('agent.launch', {
       workspaceId: ws.workspaceId,
       agent,
-      prompt: opsxPrompt(step, change)
+      prompt: promptFor(step, change, style)
     })
     launched.add(terminalId)
     return { terminalId }

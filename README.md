@@ -7,9 +7,9 @@ An [Orca](https://github.com/stablyai/orca) plugin for [OpenSpec](https://github
 - **Changes tab:** every active change in `openspec/changes/` as a compact row with a status (Planning, Not started, In progress, Ready to archive), a progress bar and the checked/total task count from its `tasks.md`. You can filter by name, or use the All / In progress / Done chips.
 - **Specs tab:** every capability under `openspec/specs/`, including nested ones such as `billing/invoices`, with a name filter.
 - **Actions:**
-  - **+** (New change) in the header starts an agent with `/opsx:propose`.
+  - **+** (New change) in the header starts an agent with `/openspec-propose`; the agent asks what to build.
   - Selecting a change shows **Apply** and **Verify**. Once every task is done, **Archive** replaces Verify.
-  - Apply, Verify and Archive start an agent in the current workspace with `/opsx:apply <change>`, `/opsx:verify <change>` or `/opsx:archive <change>`.
+  - Apply, Verify and Archive start an agent in the current workspace with the matching OpenSpec command for the change: `/openspec-apply-change <change>`, `/openspec-verify-change <change>` or `/openspec-archive-change <change>`. If your agent has `/opsx:*` commands instead, set **Command style** to OPSX.
 - **Palette commands:** `OpenSpec: New change`, `Apply change`, `Verify change`, `Archive change` and `Refresh panel`. Apply, Verify and Archive use the change selected in the panel, or the only change if there is just one.
 - **Auto-refresh:** the panel updates about 300 ms after files in `openspec/` change, when you switch workspace, and when an agent the plugin started finishes.
 - **Init OpenSpec:** in a workspace without an `openspec/` folder, a button opens a terminal running `openspec init`.
@@ -17,7 +17,7 @@ An [Orca](https://github.com/stablyai/orca) plugin for [OpenSpec](https://github
 ## Requirements
 
 - Orca 1.4.248 or newer
-- The [`openspec` CLI](https://github.com/Fission-AI/OpenSpec), for Init OpenSpec and for the `/opsx` commands your agent runs
+- The [`openspec` CLI](https://github.com/Fission-AI/OpenSpec), for Init OpenSpec
 - An agent with the OpenSpec skills or slash commands installed (default: `claude`)
 
 ## Install (development)
@@ -38,7 +38,7 @@ The plugin runs a Node worker with your user account's access. It asks for:
 | --- | --- |
 | `workspace:read` | Finding the focused workspace and its path |
 | `agent:read` | Refreshing when a launched agent finishes |
-| `agent:launch` | Starting `/opsx` agents |
+| `agent:launch` | Starting agents for OpenSpec commands |
 | `terminal:send` | Running `openspec init` in a terminal |
 | `notifications:show` | Telling you to select a change first |
 | `storage:own`, `settings:own` | Remembering the selected change and the agent setting |
@@ -47,7 +47,8 @@ The plugin runs a Node worker with your user account's access. It asks for:
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
-| Agent | `claude` | Agent CLI launched for `/opsx` commands |
+| Agent | `claude` | Agent CLI launched for OpenSpec commands |
+| Command style | Skill commands | `/openspec-propose`, `/openspec-apply-change <change>`, … (what `openspec init` installs for Claude Code), or OPSX: `/opsx:propose`, `/opsx:apply <change>`, … |
 
 ## Limitations
 

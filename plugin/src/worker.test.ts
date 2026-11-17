@@ -56,7 +56,7 @@ test('answers state and launches /opsx agents', async () => {
   assert.equal(state.changes.length, 2)
   await worker.request('openspec.launch', { step: 'apply', change: 'add-auth' })
   assert.deepEqual(h.callsOf('agent.launch'), [
-    { workspaceId: 'w1', agent: 'claude', prompt: '/opsx:apply add-auth' }
+    { workspaceId: 'w1', agent: 'claude', prompt: '/openspec-apply-change add-auth' }
   ])
   assert.deepEqual(worker.refusals, [])
   await worker.deactivate()
@@ -100,5 +100,35 @@ test('reports no-openspec for a bare folder and inits it', async () => {
   assert.equal(state.status, 'no-openspec')
   await worker.request('openspec.init')
   assert.equal((h.callsOf('terminal.create')[0] as { command: string }).command, 'openspec init')
+  await worker.deactivate()
+})
+
+test('builds skill prompts by default and opsx prompts on request', () => {
+  assert.equal(main.promptFor('propose', undefined, 'skill'), '/openspec-propose')
+  assert.equal(main.promptFor('apply', 'a', 'skill'), '/openspec-apply-change a')
+  assert.equal(main.promptFor('verify', 'a', 'skill'), '/openspec-verify-change a')
+  assert.equal(main.promptFor('archive', 'a', 'skill'), '/openspec-archive-change a')
+  assert.equal(main.promptFor('apply', 'a', 'opsx'), '/opsx:apply a')
+  assert.equal(main.promptFor('propose', undefined, 'opsx'), '/opsx:propose')
+  assert.equal(main.commandStyleOf(undefined), 'skill')
+  assert.equal(main.commandStyleOf('bogus'), 'skill')
+  assert.equal(main.commandStyleOf('opsx'), 'opsx')
+})
+
+test('uses the commandStyle setting when launching', async () => {
+  const h = mockHost({
+    results: {
+      'workspace.readContext': { workspaceId: 'w1', branch: 'main', displayName: 'demo', terminals: [] },
+      'workspace.list': {
+        workspaces: [{ id: 'w1', kind: 'folder', name: 'demo', path: fixture(), branch: 'main', hostId: 'local' }],
+        truncated: false
+      },
+      'agent.launch': { terminalId: 't1' }
+    },
+    settings: { agent: 'claude', commandStyle: 'opsx' }
+  })
+  const worker = await mountWorker(main, { host: h })
+  await worker.request('openspec.launch', { step: 'verify', change: 'add-auth' })
+  assert.equal((h.callsOf('agent.launch')[0] as { prompt: string }).prompt, '/opsx:verify add-auth')
   await worker.deactivate()
 })
