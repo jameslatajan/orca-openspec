@@ -7,7 +7,7 @@ declare module 'orca' {
     'openspec.state': { output: OpenSpecState }
     /** Launches an agent in the focused workspace and types the OpenSpec command for `step`. */
     'openspec.launch': {
-      input: { step: OpsxStep; change?: string; description?: string; agent?: string }
+      input: { step: OpsxStep; change?: string; description?: string; agent?: string; model?: string }
       output: { terminalId: string }
     }
     /** The agent kinds the New change form offers, the default first. */

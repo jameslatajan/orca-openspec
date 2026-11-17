@@ -197,3 +197,19 @@ test('the palette command opens the form', async () => {
   assert.ok(view.find({ label: 'Describe the change' }))
   await view.unmount()
 })
+
+test('Model picker shows only for claude and is sent with Explore', async () => {
+  const { host, launches } = setupHost()
+  const view = await mount(panel, { host })
+  await view.press({ label: 'New change' })
+  await view.select({ label: 'Agent' }, 'claude') // earlier tests leave the form on codex
+  assert.ok(view.find({ label: 'Model' }))
+  await view.select({ label: 'Agent' }, 'codex')
+  assert.equal(view.find({ label: 'Model' }), null)
+  await view.select({ label: 'Agent' }, 'claude')
+  await view.select({ label: 'Model' }, 'sonnet')
+  await view.type({ label: 'Describe the change' }, 'add dark mode')
+  await view.press({ text: 'Explore' })
+  assert.deepEqual(launches, [{ step: 'explore', description: 'add dark mode', agent: 'claude', model: 'sonnet' }])
+  await view.unmount()
+})

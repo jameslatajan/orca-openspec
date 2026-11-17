@@ -7,7 +7,7 @@ An [Orca](https://github.com/stablyai/orca) plugin for [OpenSpec](https://github
 - **Changes tab:** every active change in `openspec/changes/` as a compact row with a status (Planning, Not started, In progress, Ready to archive), a progress bar and the checked/total task count from its `tasks.md`. You can filter by name, or use the All / In progress / Done chips.
 - **Specs tab:** every capability under `openspec/specs/`, including nested ones such as `billing/invoices`, with a name filter.
 - **Actions:**
-  - **+** (New change) in the header opens a form. Describe the change, pick an agent (claude, codex, gemini, opencode, cursor or copilot), then press **Explore** (`/openspec-explore <description>`) or **Propose** (`/openspec-propose <description>`).
+  - **+** (New change) in the header opens a form. Describe the change, pick an agent (claude, codex, gemini, opencode, cursor or copilot), then press **Explore** (`/openspec-explore <description>`) or **Propose** (`/openspec-propose <description>`). With **claude**, you can also pick a **Model** (Default, Opus, Sonnet or Haiku): the plugin types `/model <name>` before the command.
   - Every action opens the agent's terminal where you can see it. The plugin waits until the agent is ready, then types the command for you.
   - Selecting a change shows **Apply** and **Verify**. Once every task is done, **Archive** replaces Verify.
   - Apply, Verify and Archive start an agent in the current workspace with the matching OpenSpec command for the change: `/openspec-apply-change <change>`, `/openspec-verify-change <change>` or `/openspec-archive-change <change>`. If your agent has `/opsx:*` commands instead, set **Command style** to OPSX.

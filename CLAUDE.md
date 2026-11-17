@@ -49,6 +49,8 @@ The authoritative plugin API reference ships with the CLI. Read it instead of gu
 - `engines.orca` must be ≥ the newest `Since` of anything used. It is `>=1.4.248` because a capability requires it, and `plugin check` fails if it is lower.
 - Adding a capability, command or event changes the approval fingerprint. The user must re-approve the plugin (`orca plugin dev load ./plugin --approve <fingerprint>`), so never approve on their behalf. Code-only edits reload without approval.
 - `<Progress value>` is 0–100, not 0–1.
+- A `<Select>` option with value `''` makes the Select silently not render; use a real value such as `'default'`.
+- Unkeyed form atoms live at module level, so they carry over between panel tests. Set the agent explicitly in a test instead of relying on the default.
 - Never pass `prompt` to `agent.launch`. In practice the agent starts as an *orphaned* background terminal (no pane; check with `orca terminal list --worktree <id>`) and the prompt never arrives. `launchVisible()` launches without a prompt, calls `terminal.focus`, polls `terminal.read` until `isAgentReady()` sees an input marker (`❯`, `>`, `›`) on a stable screen, then calls `terminal.sendText`. Timings live in `options`, so tests shorten them.
 - Agent prompts come from `promptFor()` in `worker.ts` and follow the `commandStyle` setting. The default `skill` sends `/openspec-apply-change <change>` and so on. Bare `/opsx:*` commands don't exist on a default install: the agent opens and silently does nothing.
 - Panel-only UI state (tab, filters, chip) uses `persist: 'plugin'`. With `persist: 'storage'`, a controlled `Input` or a chip loses input to the storage echo: typing "AUTH" kept "A". Reserve `'storage'` for values the worker reads, such as `selectedChange`.

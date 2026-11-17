@@ -198,3 +198,29 @@ test('palette New change asks open panels to show the form', async () => {
   assert.equal(h.callsOf('agent.launch').length, 0)
   await worker.deactivate()
 })
+
+test('switches the Claude model before sending the command', async () => {
+  const h = host(fixture())
+  const worker = await mountWorker(main, { host: h })
+  await worker.request('openspec.launch', { step: 'explore', description: 'add dark mode', agent: 'claude', model: 'sonnet' })
+  assert.deepEqual(sent(h), ['/model sonnet', '/openspec-explore add dark mode'])
+  await worker.deactivate()
+})
+
+test('sends no /model for the default, other agents, bad values or Apply', async () => {
+  const h = host(fixture())
+  const worker = await mountWorker(main, { host: h })
+  await worker.request('openspec.launch', { step: 'explore', description: 'a', agent: 'claude' })
+  await worker.request('openspec.launch', { step: 'explore', description: 'b', agent: 'codex', model: 'sonnet' })
+  await worker.request('openspec.launch', { step: 'propose', description: 'c', agent: 'claude', model: 'gpt-5; rm -rf' })
+  await worker.request('openspec.launch', { step: 'apply', change: 'add-auth', agent: 'claude', model: 'opus' })
+  assert.deepEqual(sent(h), [
+    '/openspec-explore a',
+    '/openspec-explore b',
+    '/openspec-propose c',
+    '/openspec-apply-change add-auth'
+  ])
+  assert.equal(main.modelCommand('claude', 'haiku'), '/model haiku')
+  assert.equal(main.modelCommand('claude', ''), null)
+  await worker.deactivate()
+})

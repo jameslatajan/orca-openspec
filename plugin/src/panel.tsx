@@ -66,6 +66,15 @@ const formAgent = atom<string | null>(null)
 const agentOptions = atom<string[]>([])
 const formBusy = atom(false)
 const formError = atom<string | null>(null)
+/** Claude model for the form; 'default' = Claude's own default. Remembered across panel runs. */
+const formModel = atom<string>('formModel', 'default', { persist: 'plugin' })
+
+const MODELS = [
+  { value: 'default', label: 'Default' },
+  { value: 'opus', label: 'Opus' },
+  { value: 'sonnet', label: 'Sonnet' },
+  { value: 'haiku', label: 'Haiku' }
+]
 
 async function openForm(): Promise<void> {
   set(formError, null)
@@ -95,7 +104,14 @@ async function startFromForm(step: 'explore' | 'propose'): Promise<void> {
   set(formError, null)
   try {
     const agent = read(formAgent) ?? undefined
-    await plugin.request('openspec.launch', agent ? { step, description: text, agent } : { step, description: text })
+    const picked = read(formModel)
+    const model = agent === 'claude' && picked !== 'default' ? picked : ''
+    await plugin.request('openspec.launch', {
+      step,
+      description: text,
+      ...(agent ? { agent } : {}),
+      ...(model ? { model } : {})
+    })
     closeForm()
   } catch (err) {
     set(formError, err instanceof Error ? err.message : String(err))
@@ -128,6 +144,15 @@ function NewChangeForm() {
         disabled={busy}
         onChange={(v) => set(formAgent, v)}
       />
+      {(read(formAgent) ?? agents[0]) === 'claude' ? (
+        <Select
+          label="Model"
+          value={read(formModel)}
+          options={MODELS}
+          disabled={busy}
+          onChange={(v) => set(formModel, v)}
+        />
+      ) : null}
       {err ? <Callout tone="danger">{err}</Callout> : null}
       <Row gap="xs">
         <Button variant="solid" tone="accent" icon="search" disabled={empty || busy} onPress={() => startFromForm('explore')}>

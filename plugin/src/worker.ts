@@ -85,12 +85,40 @@ async function defaultAgent(orca: OrcaWorkerApi): Promise<string> {
   return typeof setting === 'string' && setting ? setting : 'claude'
 }
 
-/** Starts an agent, shows its terminal, waits until it accepts input, then types the prompt. */
+/** Claude Code model aliases the form may send as `/model <alias>`; nothing else is typed. */
+export const CLAUDE_MODELS = ['opus', 'sonnet', 'haiku']
+
+/** The `/model` command to send first, or null for the default model or a non-Claude agent. */
+export function modelCommand(agent: string, model: string | undefined): string | null {
+  return agent === 'claude' && model && CLAUDE_MODELS.includes(model) ? `/model ${model}` : null
+}
+
+/** Polls the terminal until it shows an input prompt on a stable screen; false on timeout. */
+async function waitReady(orca: OrcaWorkerApi, terminalId: string): Promise<boolean> {
+  let previous = ''
+  const deadline = Date.now() + options.readyTimeoutMs
+  while (Date.now() < deadline) {
+    await sleep(options.readyPollMs)
+    try {
+      const { lines } = await orca.host.call('terminal.read', { terminalId, maxLines: 60 })
+      const screen = lines.join('\n')
+      if (isAgentReady(lines) && screen === previous) return true
+      previous = screen
+    } catch {
+      // The terminal may not be readable for a moment after launch; keep polling.
+    }
+  }
+  return false
+}
+
+/** Starts an agent, shows its terminal, waits until it accepts input, optionally switches its
+ *  model, then types the prompt. */
 async function launchVisible(
   orca: OrcaWorkerApi,
   workspaceId: string,
   agent: string,
-  prompt: string
+  prompt: string,
+  model?: string
 ): Promise<string> {
   const { terminalId } = await orca.host.call('agent.launch', { workspaceId, agent })
   try {
@@ -98,24 +126,16 @@ async function launchVisible(
   } catch (err) {
     orca.log(`openspec: could not show terminal: ${err instanceof Error ? err.message : String(err)}`)
   }
-  let previous = ''
-  let ready = false
-  const deadline = Date.now() + options.readyTimeoutMs
-  while (Date.now() < deadline) {
-    await sleep(options.readyPollMs)
-    try {
-      const { lines } = await orca.host.call('terminal.read', { terminalId, maxLines: 60 })
-      const screen = lines.join('\n')
-      if (isAgentReady(lines) && screen === previous) {
-        ready = true
-        break
-      }
-      previous = screen
-    } catch {
-      // The terminal may not be readable for a moment after launch; keep polling.
-    }
+  const timedOut = (what: string) =>
+    orca.log(`openspec: ${agent} did not look ready ${what} after ${options.readyTimeoutMs} ms; sending anyway`)
+  if (!(await waitReady(orca, terminalId))) timedOut('at start')
+  const switchModel = modelCommand(agent, model)
+  if (switchModel) {
+    await orca.host.call('terminal.sendText', { terminalId, text: switchModel, enter: true })
+    // Let the screen change before polling, so the pre-/model screen isn't taken as ready.
+    await sleep(options.readyPollMs * 2)
+    if (!(await waitReady(orca, terminalId))) timedOut('after /model')
   }
-  if (!ready) orca.log(`openspec: ${agent} did not look ready after ${options.readyTimeoutMs} ms; sending anyway`)
   await orca.host.call('terminal.sendText', { terminalId, text: prompt, enter: true })
   return terminalId
 }
@@ -164,12 +184,17 @@ export default function activate(orca: OrcaWorkerApi): void {
     return post()
   }
 
-  const launch = async (step: OpsxStep, arg?: string, agentKind?: string): Promise<{ terminalId: string }> => {
+  const launch = async (
+    step: OpsxStep,
+    arg?: string,
+    agentKind?: string,
+    model?: string
+  ): Promise<{ terminalId: string }> => {
     const ws = await focused(orca)
     if (!ws) throw Object.assign(new Error('No workspace is focused.'), { code: 'invalid_params' })
     const agent = agentKind && agentKind.trim() ? agentKind.trim() : await defaultAgent(orca)
     const style = commandStyleOf(await orca.settings.get('commandStyle'))
-    const terminalId = await launchVisible(orca, ws.workspaceId, agent, promptFor(step, arg, style))
+    const terminalId = await launchVisible(orca, ws.workspaceId, agent, promptFor(step, arg, style), model)
     launched.add(terminalId)
     return { terminalId }
   }
@@ -178,8 +203,9 @@ export default function activate(orca: OrcaWorkerApi): void {
     await retarget()
     return readState(orca)
   })
-  orca.panels.handle('openspec.launch', ({ step, change, description, agent }) =>
-    launch(step, change ?? description, agent)
+  orca.panels.handle('openspec.launch', ({ step, change, description, agent, model }) =>
+    // Only the form's Explore and Propose pick a model.
+    launch(step, change ?? description, agent, step === 'explore' || step === 'propose' ? model : undefined)
   )
   orca.panels.handle('openspec.agents', async () => {
     const preferred = await defaultAgent(orca)
