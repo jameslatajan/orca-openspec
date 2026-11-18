@@ -2,8 +2,8 @@
   "manifestVersion": 2,
   "id": "openspec",
   "name": "OpenSpec",
-  "version": "0.1.0",
-  "description": "See a workspace's OpenSpec changes and specs, and launch /opsx propose, apply, verify and archive agents.",
+  "version": "1.0.0",
+  "description": "OpenSpec in Orca: see a workspace's changes and specs (local or in a shared store), open a Kanban board, and start agents to explore, propose, apply, verify and archive changes.",
   "engines": {
     "orca": ">=1.4.248"
   },

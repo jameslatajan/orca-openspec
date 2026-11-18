@@ -31,15 +31,21 @@ An [Orca](https://github.com/stablyai/orca) plugin for [OpenSpec](https://github
 - The [`openspec` CLI](https://github.com/Fission-AI/OpenSpec), for Init OpenSpec
 - An agent with the OpenSpec skills or slash commands installed (default: `claude`)
 
-## Install (development)
+## Install
+
+```sh
+orca plugin install jameslatajan/orca-openspec
+```
+
+Orca shows the access the plugin asks for (below) and installs it once you approve. Then open **OpenSpec** (the flag icon) in Orca's right sidebar. `orca plugin update` moves you to the newest release later.
+
+To work on the plugin instead, run it from a clone:
 
 ```sh
 git clone https://github.com/jameslatajan/orca-openspec.git
 cd orca-openspec
-orca plugin dev watch ./plugin
+orca plugin dev watch .
 ```
-
-The first load shows the access the plugin asks for and waits for your approval. Then open **OpenSpec** in Orca's right sidebar.
 
 ### Permissions
 
@@ -73,19 +79,20 @@ The plugin runs a Node worker with your user account's access. It asks for:
 The plugin needs no build step: Orca transpiles the TypeScript when it loads. With `dev watch` running, saving a file reloads it.
 
 ```
-plugin/
-  orca-plugin.json     manifest: panel, commands, events, settings, capabilities
-  src/worker.ts        reads openspec/, launches agents, watches for changes
-  src/openspec.ts      parses changes, task checkboxes and specs (pure Node)
-  src/watch.ts         recursive, debounced folder watcher
-  src/panel.tsx        the sidebar panel (Orca components, TSX)
-  src/protocol.ts      typed panel <-> worker requests and events
-  src/*.test.ts(x)     tests
-openspec/              this project's own OpenSpec specs and archived changes
+orca-plugin.json     manifest: panel, board editor, commands, events, settings, capabilities
+src/worker.ts        reads openspec/, launches agents, watches for changes, manages stores
+src/openspec.ts      parses changes, task checkboxes and specs (pure Node)
+src/store.ts         store lookup, linking, creating and switching
+src/view.ts          status, filter and system-prefix logic shared by panel and board
+src/watch.ts         recursive, debounced folder watcher
+src/panel.tsx        the sidebar panel (Orca components, TSX)
+src/protocol.ts      typed panel <-> worker requests and events
+board/main.ts        the Kanban board tab (plain DOM)
+src/*.test.ts(x)     tests
+openspec/            this project's own OpenSpec specs and archived changes
 ```
 
 ```sh
-cd plugin
 orca plugin test .       # worker and panel tests
 orca plugin check .      # validate the manifest and render the panel
 orca plugin validate .

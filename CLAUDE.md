@@ -4,11 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-An Orca plugin (`plugin/`) that adds an OpenSpec sidebar panel: active changes with task progress, specs, and buttons/palette commands that launch agents with the OpenSpec commands (`/openspec-propose`, `/openspec-apply-change`, …, or `/opsx:*` via the Command style setting). The repo also tracks its own development with OpenSpec (`openspec/`).
+An Orca plugin (the repo root: `orca-plugin.json`, `src/`, `board/`) that adds an OpenSpec sidebar panel: active changes with task progress, specs, and buttons/palette commands that launch agents with the OpenSpec commands (`/openspec-propose`, `/openspec-apply-change`, …, or `/opsx:*` via the Command style setting). The repo also tracks its own development with OpenSpec (`openspec/`).
 
 ## Commands
 
-Run these from `plugin/`. There is no build step and no package install: Orca transpiles the TypeScript and TSX when it loads them.
+Run these from the repo root (the plugin lives there so `orca plugin install jameslatajan/orca-openspec` works). There is no build step and no package install: Orca transpiles the TypeScript and TSX when it loads them.
 
 ```sh
 orca plugin test .        # all *.test.ts(x) via node:test; no per-test filter, so run the whole suite
@@ -20,12 +20,12 @@ orca plugin logs local.openspec
 orca plugin open local.openspec --panel openspec
 ```
 
-Screenshot the live panel: `timeout 25 orca plugin dev watch ./plugin --shot <dir> --shot-panel openspec`.
+Screenshot the live panel: `timeout 25 orca plugin dev watch . --shot <dir> --shot-panel openspec`.
 
 The authoritative plugin API reference ships with the CLI. Read it instead of guessing:
 - `orca skills get orca-plugin-authoring`
 - `orca skills get orca-plugin-authoring --reference <host-api|manifest|recipes|cli|workflow>`
-- the typings in `plugin/.orca/types/`
+- the typings in `.orca/types/`
 
 ## Architecture
 
@@ -64,9 +64,9 @@ The authoritative plugin API reference ships with the CLI. Read it instead of gu
 ## Gotchas
 
 - `engines.orca` must be ≥ the newest `Since` of anything used. It is `>=1.4.248` because a capability requires it, and `plugin check` fails if it is lower.
-- Adding a capability, command or event changes the approval fingerprint. The user must re-approve the plugin (`orca plugin dev load ./plugin --approve <fingerprint>`), so never approve on their behalf. Code-only edits reload without approval.
+- Adding a capability, command or event changes the approval fingerprint. The user must re-approve the plugin (`orca plugin dev load . --approve <fingerprint>`), so never approve on their behalf. Code-only edits reload without approval.
 - Every worker request acts on Orca's *focused* workspace, and focus can move between CLI calls. Never drive write requests (`setStore`, `linkStore`, `createStore`, `openBoard`) with `orca plugin dev request` against real projects: one such unlink hit the wrong project. Test writes with unit tests on temp folders, or have the user click in the panel of the workspace they're looking at.
-- After changing `orca-plugin.json` (commands, editors, events), run `orca plugin dev reload ./plugin`. `dev load` can report `ok` while Orca keeps the old manifest. A command the worker registers but the old manifest lacks makes Orca drop events, shown in `orca plugin logs` as "registered undeclared command".
+- After changing `orca-plugin.json` (commands, editors, events), run `orca plugin dev reload .`. `dev load` can report `ok` while Orca keeps the old manifest. A command the worker registers but the old manifest lacks makes Orca drop events, shown in `orca plugin logs` as "registered undeclared command".
 - `<Progress value>` is 0–100, not 0–1.
 - After a panel test waits on a timer (for example the Refresh spinner's 500 ms minimum), call `await view.settled()` before `find`; otherwise the view still shows the old render.
 - A `<Select>` option with value `''` makes the Select silently not render; use a real value such as `'default'`.
@@ -85,3 +85,7 @@ The authoritative plugin API reference ships with the CLI. Read it instead of gu
 - New features go through a change: propose → apply → archive. Delta specs use `## ADDED/MODIFIED Requirements` with `#### Scenario:` blocks.
 - Validate with `openspec validate <change>` and `openspec validate --specs`.
 - This repo uses git (`main`, remote `origin` on GitHub), not SVN.
+
+## Releasing
+
+Published from this public GitHub repo; there is no publish command. Bump `version` in `orca-plugin.json`, run `orca plugin validate .`, commit and push, then tag `v<version>` and push the tag. The repo carries the `orca-plugin` topic, so onorca.dev lists it. Installs use `orca plugin install jameslatajan/orca-openspec`, which picks the newest `vX.Y.Z` tag.
