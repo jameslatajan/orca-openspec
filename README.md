@@ -108,3 +108,7 @@ orca plugin validate .
 ```
 
 This plugin is itself built with OpenSpec: see `openspec/specs/openspec-panel/spec.md` for the requirements, and `openspec/changes/archive/` for the changes that produced it.
+
+## License
+
+[Apache-2.0](LICENSE)

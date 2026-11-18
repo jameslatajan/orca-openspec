@@ -24,15 +24,19 @@ import {
 import { parse, toDom } from './markdown'
 
 const COLUMNS: { status: Status; title: string; color: string }[] = [
-  { status: 'Planning', title: 'Planning', color: '#E8A15A' },
-  { status: 'Not started', title: 'Not started', color: '#8A8A92' },
+  { status: 'Planning', title: 'Planning', color: 'var(--s-planning)' },
+  { status: 'Not started', title: 'Not started', color: 'var(--s-idle)' },
   { status: 'In progress', title: 'In progress', color: 'var(--orca-primary)' },
-  { status: 'Ready to archive', title: 'Ready to archive', color: '#4CC38A' }
+  { status: 'Ready to archive', title: 'Ready to archive', color: 'var(--s-done)' }
 ]
-const ARCHIVED_COLOR = '#A78BFA'
+const ARCHIVED_COLOR = 'var(--s-archived)'
 
+// Orca's theme has no status hues, so they are defined here per mode. Orca puts a `light` or `dark`
+// class on <html> and updates the --orca-* variables in place; the light values are darker so the
+// status text keeps a 4.5:1 contrast on light backgrounds.
 const CSS = `
-:root { color-scheme: light dark; }
+:root { color-scheme: dark; --s-planning: #E8A15A; --s-idle: #8A8A92; --s-done: #4CC38A; --s-archived: #A78BFA; }
+:root.light { color-scheme: light; --s-planning: #B45309; --s-idle: #6B6B73; --s-done: #15803D; --s-archived: #7C3AED; }
 * { box-sizing: border-box; }
 body { margin: 0; height: 100vh; display: flex; flex-direction: column; background: var(--orca-background);
   color: var(--orca-foreground); font: 13px/1.45 var(--orca-font-sans, system-ui, sans-serif); }
@@ -41,7 +45,7 @@ button { cursor: pointer; }
 .muted { color: var(--orca-muted-foreground); }
 header { display: flex; align-items: center; gap: 12px; padding: 10px 18px; border-bottom: 1px solid var(--orca-border); flex-wrap: wrap; }
 .title { all: unset; cursor: pointer; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.title:focus-visible { outline: 2px solid var(--orca-primary); outline-offset: 2px; border-radius: 4px; }
+.title:focus-visible { outline: 2px solid var(--orca-ring); outline-offset: 2px; border-radius: 4px; }
 .title b { font-size: 15px; }
 .title span { font-size: 11px; }
 .seg { display: flex; gap: 4px; align-items: center; }
@@ -50,14 +54,14 @@ header { display: flex; align-items: center; gap: 12px; padding: 10px 18px; bord
 .btn.on, .btn.primary { background: var(--orca-primary); color: var(--orca-primary-foreground); border-color: transparent; font-weight: 600; }
 .btn.ghost { border-color: transparent; color: var(--orca-muted-foreground); }
 .btn.ghost:hover { color: var(--orca-foreground); background: var(--orca-muted); }
-.btn.danger { background: var(--orca-destructive, #DC4A4A); color: #fff; border-color: transparent; font-weight: 600; }
+.btn.danger { background: var(--orca-destructive); color: var(--orca-destructive-foreground); border-color: transparent; font-weight: 600; }
 .btn.sm { height: 24px; padding: 0 8px; font-size: 11px; }
 .btn:disabled { opacity: .5; cursor: default; }
-.search { height: 30px; width: 260px; padding: 0 10px; border-radius: 7px; border: 1px solid var(--orca-border); background: var(--orca-input, transparent); }
+.search { height: 30px; width: 260px; padding: 0 10px; border-radius: 7px; border: 1px solid var(--orca-input, var(--orca-border)); background: transparent; }
 .spacer { flex: 1; }
 .form { display: none; gap: 8px; padding: 10px 18px; border-bottom: 1px solid var(--orca-border); align-items: flex-start; }
 .form.open { display: flex; }
-.form textarea { flex: 1; min-height: 56px; padding: 8px; border-radius: 6px; border: 1px solid var(--orca-border); background: var(--orca-input, transparent); resize: vertical; }
+.form textarea { flex: 1; min-height: 56px; padding: 8px; border-radius: 6px; border: 1px solid var(--orca-input, var(--orca-border)); background: transparent; resize: vertical; }
 .error { padding: 8px 18px; color: var(--orca-destructive); display: none; }
 .error.show { display: block; }
 .body { flex: 1; min-height: 0; display: flex; position: relative; }
@@ -73,13 +77,13 @@ header { display: flex; align-items: center; gap: 12px; padding: 10px 18px; bord
 .card { position: relative; display: flex; flex-direction: column; gap: 6px; padding: 10px; border-radius: 8px; border: 1px solid var(--orca-border); background: var(--orca-background); }
 .card:hover, .card:focus-within { border-color: var(--orca-primary); }
 .card .open { all: unset; cursor: pointer; display: flex; flex-direction: column; gap: 5px; min-width: 0; }
-.card .open:focus-visible { outline: 2px solid var(--orca-primary); outline-offset: 4px; border-radius: 4px; }
+.card .open:focus-visible { outline: 2px solid var(--orca-ring); outline-offset: 4px; border-radius: 4px; }
 .name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .summary { font-size: 12px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .meta { display: flex; align-items: center; gap: 8px; font-size: 11px; }
 .meta .date { margin-left: auto; }
 .bar { width: 64px; height: 5px; border-radius: 3px; background: var(--orca-muted); overflow: hidden; flex: none; }
-.bar i { display: block; height: 100%; background: #4CC38A; }
+.bar i { display: block; height: 100%; background: var(--s-done); }
 .next { font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .quick { display: none; gap: 6px; }
 .card:hover .quick, .card:focus-within .quick { display: flex; }
@@ -120,12 +124,12 @@ header { display: flex; align-items: center; gap: 12px; padding: 10px 18px; bord
 .md .requirement { border-left: 3px solid ${ARCHIVED_COLOR}; padding-left: 10px; }
 .md .scenario { border: 1px solid var(--orca-border); border-radius: 8px; padding: 10px 12px; margin: 10px 0; }
 .md .scenario ul { margin: 0; padding-left: 18px; }
-.md .kw { font-weight: 700; color: #E8A15A; }
+.md .kw { font-weight: 700; color: var(--s-planning); }
 .md .link { text-decoration: underline; }
 .md blockquote { margin: 8px 0; padding-left: 10px; border-left: 3px solid var(--orca-border); color: var(--orca-muted-foreground); }
 .md li.task { list-style: none; margin-left: -20px; padding-left: 24px; position: relative; }
 .md li.task .chk { position: absolute; left: 0; top: .3em; width: 14px; height: 14px; border-radius: 4px; border: 1.5px solid var(--orca-border); display: grid; place-items: center; font-size: 10px; line-height: 1; }
-.md li.task .chk.on { background: #4CC38A; border-color: #4CC38A; color: #06210F; }
+.md li.task .chk.on { background: var(--s-done); border-color: var(--s-done); color: var(--orca-background); }
 .md li.task.done { color: var(--orca-muted-foreground); }
 .side { display: flex; flex-direction: column; gap: 12px; position: sticky; top: 0; }
 .box { border: 1px solid var(--orca-border); border-radius: 12px; background: var(--orca-card); padding: 12px 14px; }
@@ -133,7 +137,7 @@ header { display: flex; align-items: center; gap: 12px; padding: 10px 18px; bord
 .kv { display: flex; justify-content: space-between; gap: 8px; padding: 3px 0; font-size: 12px; }
 .kv span:last-child { text-align: right; overflow-wrap: anywhere; }
 .rel { all: unset; cursor: pointer; display: block; padding: 7px 9px; border-radius: 7px; border: 1px solid var(--orca-border); margin-top: 6px; font-size: 12px; overflow-wrap: anywhere; }
-.rel:hover, .rel:focus-visible { border-color: var(--orca-primary); }
+.rel:hover { border-color: var(--orca-primary); } .rel:focus-visible { outline: 2px solid var(--orca-ring); outline-offset: 1px; }
 .rel small { display: block; color: var(--orca-muted-foreground); }
 /* specs drawer */
 .drawer { width: 300px; flex: none; border-left: 1px solid var(--orca-border); display: flex; flex-direction: column; min-height: 0; background: var(--orca-background); }
@@ -147,11 +151,11 @@ header { display: flex; align-items: center; gap: 12px; padding: 10px 18px; bord
 .notice { padding: 40px; text-align: center; }
 /* dialog */
 .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); display: grid; place-items: center; padding: 16px; z-index: 10; }
-.dialog { width: 100%; max-width: 460px; background: var(--orca-card); color: var(--orca-card-foreground); border: 1px solid var(--orca-border); border-radius: 12px; padding: 18px 20px; box-shadow: 0 20px 50px rgba(0,0,0,.4); }
+.dialog { width: 100%; max-width: 460px; background: var(--orca-popover); color: var(--orca-popover-foreground); border: 1px solid var(--orca-border); border-radius: 12px; padding: 18px 20px; box-shadow: 0 20px 50px rgba(0,0,0,.4); }
 .dialog h3 { margin: 0 0 8px; font-size: 15px; overflow-wrap: anywhere; }
 .dialog p { margin: 0 0 12px; color: var(--orca-muted-foreground); line-height: 1.55; }
 .dialog code { font: 11px var(--orca-font-mono, ui-monospace, monospace); background: var(--orca-muted); padding: 1px 5px; border-radius: 4px; color: var(--orca-foreground); overflow-wrap: anywhere; }
-.warn { border: 1px solid #E8A15A; color: #E8A15A; border-radius: 8px; padding: 8px 10px; font-size: 12px; margin-bottom: 12px; }
+.warn { border: 1px solid var(--s-planning); color: var(--s-planning); border-radius: 8px; padding: 8px 10px; font-size: 12px; margin-bottom: 12px; }
 .dialog .row { display: flex; justify-content: flex-end; gap: 8px; }
 @media (max-width: 820px) { .layout { grid-template-columns: 1fr; } .side { position: static; } }
 `
