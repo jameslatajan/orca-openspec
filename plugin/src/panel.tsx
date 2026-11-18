@@ -4,6 +4,7 @@ import {
   Badge,
   Box,
   Button,
+  Card,
   Callout,
   EmptyState,
   Heading,
@@ -16,6 +17,7 @@ import {
   read,
   Row,
   Select,
+  Separator,
   set,
   Spinner,
   Stack,
@@ -198,9 +200,8 @@ function ChangeStoreBox(props: { current: string; prefixes: string[] }) {
   const target = pick && stores.includes(pick) ? pick : stores[0]
   const busy = read(storeBusy)
   return (
-    <Box direction="column" gap="sm" padding="sm">
-      <Text>Store settings</Text>
-      <Row gap="xs">
+    <Card title="Store settings">
+      <Stack gap="sm" align="stretch">
         <Input
           label="System prefixes"
           placeholder="e.g. eclaims, ess"
@@ -214,9 +215,7 @@ function ChangeStoreBox(props: { current: string; prefixes: string[] }) {
         <Button size="sm" variant="solid" disabled={busy || !read(editingSystem)} onPress={saveSystem}>
           Save
         </Button>
-      </Row>
-      {stores.length ? (
-        <Row gap="xs">
+        {stores.length ? (
           <Select
             label="Switch to"
             value={target}
@@ -224,27 +223,21 @@ function ChangeStoreBox(props: { current: string; prefixes: string[] }) {
             disabled={busy}
             onChange={(v) => set(storePick, v)}
           />
+        ) : null}
+        {stores.length ? (
           <Button size="sm" variant="solid" disabled={busy} onPress={() => switchStore(target)}>
             Switch
           </Button>
-        </Row>
-      ) : (
-        <Text muted size="xs">
-          No other stores are registered.
-        </Text>
-      )}
-      <Row gap="xs">
+        ) : null}
+        <Separator />
         <Button size="sm" variant="outline" icon="add" disabled={busy} onPress={openNewStore}>
           New store
         </Button>
         <Button size="sm" variant="outline" tone="danger" disabled={busy} onPress={() => switchStore(null)}>
           Unlink
         </Button>
-      </Row>
-      <Text muted size="xs">
-        Switch and Unlink edit only the store: line in openspec/config.yaml.
-      </Text>
-    </Box>
+      </Stack>
+    </Card>
   )
 }
 
@@ -533,22 +526,40 @@ function LinkStore() {
 
 
 /** "via store <id>" plus the store settings pencil. */
+function StoreSettingsButton() {
+  return (
+    <IconButton
+      icon={read(changeStoreOpen) ? 'close' : 'edit'}
+      label={read(changeStoreOpen) ? 'Close store settings' : 'Store settings'}
+      size="xs"
+      variant="ghost"
+      onPress={() => {
+        const opening = !read(changeStoreOpen)
+        set(changeStoreOpen, opening)
+        set(newStoreOpen, false)
+        if (opening) void loadStores()
+      }}
+    />
+  )
+}
+
 function StoreBadge(props: { store: string }) {
   return (
     <Row gap="none">
       <Badge tone="accent">via store {props.store}</Badge>
-      <IconButton
-        icon={read(changeStoreOpen) ? 'close' : 'edit'}
-        label={read(changeStoreOpen) ? 'Close store settings' : 'Store settings'}
-        size="xs"
-        variant="ghost"
-        onPress={() => {
-          const opening = !read(changeStoreOpen)
-          set(changeStoreOpen, opening)
-          set(newStoreOpen, false)
-          if (opening) void loadStores()
-        }}
-      />
+      <StoreSettingsButton />
+    </Row>
+  )
+}
+
+/** The main view's store line: a small caption and the settings pencil, above the scope dropdown. */
+function StoreCaption(props: { store: string }) {
+  return (
+    <Row justify="between" align="center" gap="xs">
+      <Text muted size="xs">
+        via store {props.store}
+      </Text>
+      <StoreSettingsButton />
     </Row>
   )
 }
@@ -776,10 +787,10 @@ export default function Panel() {
     <Stack gap="sm">
       <Header title={title} canCreate store={s.store} badgeBelow />
       {s.store && view ? (
-        <Row gap="xs">
-          <StoreBadge store={s.store} />
+        <Stack gap="xs">
+          <StoreCaption store={s.store} />
           <ScopeSelect prefixes={view.prefixes} />
-        </Row>
+        </Stack>
       ) : null}
       {s.store && read(changeStoreOpen) ? (
         read(newStoreOpen) ? <NewStoreForm /> : <ChangeStoreBox current={s.store} prefixes={view?.prefixes ?? []} />

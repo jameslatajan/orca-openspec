@@ -472,7 +472,7 @@ test('store workspace: change store lets you switch or unlink', async () => {
   })
   const view = await mount(panel, { host })
   await view.press({ label: 'Store settings' })
-  assert.ok(view.find({ text: 'Store settings' }))
+  assert.ok(view.find({ label: 'Store settings', type: 'Card' }) ?? view.find({ label: 'Store settings' }))
   await view.press({ text: 'Switch' })
   assert.deepEqual(sets, ['acme'])
   assert.ok(view.find({ text: 'via store acme' }))
