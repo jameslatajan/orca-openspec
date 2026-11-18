@@ -26,6 +26,12 @@ declare module 'orca' {
     'openspec.stores': { output: { stores: { id: string }[] } }
     /** Links the focused workspace to a store (creates openspec/config.yaml) and answers fresh state. */
     'openspec.linkStore': { input: { store: string }; output: OpenSpecState }
+    /** The focused workspace's parent folder, for the new-store folder default. */
+    'openspec.storeDefaults': { output: { parent: string } }
+    /** Switches a store-linked workspace to `store`, or unlinks it with `null`. */
+    'openspec.setStore': { input: { store: string | null }; output: OpenSpecState }
+    /** Creates and registers a store; with `link`, links or switches the workspace to it. */
+    'openspec.createStore': { input: { id: string; folder: string; link: boolean }; output: OpenSpecState }
   }
   interface PluginPanelEvents {
     /** Fresh state after a workspace switch, a launched agent finishing, or a refresh. */

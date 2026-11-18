@@ -1,8 +1,8 @@
 // OpenSpec stores: a workspace's openspec/config.yaml may say `store: <id>`, meaning its changes
 // and specs live in a registered store folder. Pure helpers plus a cached `openspec store list`.
 import { exec } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
+import { isAbsolute, join } from 'node:path'
 
 /** The top-level `store:` value in an OpenSpec config, or null. Ignores comments and quotes. */
 export function storeIdFrom(configText: string): string | null {
@@ -112,4 +112,75 @@ export async function resolveStore(id: string, run: StoreListRunner = runOpenSpe
     throw new StoreError(`Store "${id}" is not registered on this machine. Run \`openspec store register <path>\`.`)
   }
   return root
+}
+
+/** Runs a fixed `openspec store setup …` command line and returns stdout. Injectable for tests. */
+export type StoreSetupRunner = (commandLine: string) => Promise<string>
+
+export const runOpenSpecStoreSetup: StoreSetupRunner = (commandLine) =>
+  new Promise((resolve, reject) => {
+    exec(commandLine, { timeout: 60_000, windowsHide: true }, (err, stdout, stderr) =>
+      err ? reject(new Error(String(stderr || err.message).trim())) : resolve(String(stdout))
+    )
+  })
+
+/** Characters a store folder may not contain: shell metacharacters, quotes and line breaks. */
+const UNSAFE_PATH = /["&|<>^%`$\r\n]/
+
+/** Creates and registers a store with `openspec store setup` (git init + first commit). */
+export async function createStore(
+  id: string,
+  folder: string,
+  run: StoreSetupRunner = runOpenSpecStoreSetup
+): Promise<{ id: string; root: string }> {
+  if (!STORE_ID.test(id)) throw new StoreError('A store id may use only letters, digits, ".", "_" and "-".')
+  const path = folder.trim()
+  if (!path || !isAbsolute(path)) throw new StoreError('Choose a full folder path for the new store.')
+  if (UNSAFE_PATH.test(path)) throw new StoreError('The folder path contains characters that are not allowed (" & | < > ^ % ` $).')
+  if (existsSync(path)) throw new StoreError(`The folder ${path} already exists. Pick a new folder.`)
+  try {
+    await run(`openspec store setup "${id}" --path "${path}" --json`)
+  } catch (err) {
+    throw new StoreError(`Creating store "${id}" failed: ${err instanceof Error ? err.message : String(err)}`)
+  }
+  clearStoreCache()
+  return { id, root: path }
+}
+
+/** The workspace's OpenSpec config file, if it has one. */
+function configFile(workspacePath: string): string | null {
+  for (const name of ['config.yaml', 'config.yml']) {
+    const file = join(workspacePath, 'openspec', name)
+    if (existsSync(file)) return file
+  }
+  return null
+}
+
+/** Switches the workspace to store `id`, or unlinks it (`null`), editing only the top-level
+ *  `store:` line. An unlinked config with nothing else in it is deleted. */
+export async function setStoreLine(
+  workspacePath: string,
+  id: string | null,
+  run: StoreListRunner = runOpenSpecStoreList
+): Promise<void> {
+  const file = configFile(workspacePath)
+  const text = file ? readFileSync(file, 'utf8') : ''
+  if (!file || !storeIdFrom(text)) {
+    throw new StoreError('This workspace is not linked to a store, so its store cannot be changed here.')
+  }
+  if (id !== null) {
+    if (!STORE_ID.test(id)) throw new StoreError(`"${id}" is not a valid store id.`)
+    const stores = await storeMap(run, `switch to store "${id}"`)
+    if (!stores.has(id)) {
+      throw new StoreError(`Store "${id}" is not registered on this machine. Run \`openspec store register <path>\`.`)
+    }
+  }
+  const eol = text.includes('\r\n') ? '\r\n' : '\n'
+  const lines = text.split(/\r?\n/)
+  const at = lines.findIndex((line) => /^store:/.test(line))
+  if (id === null) lines.splice(at, 1)
+  else lines[at] = `store: ${id}`
+  const rest = lines.filter((line) => line.trim() && !line.trim().startsWith('#'))
+  if (id === null && rest.length === 0) unlinkSync(file)
+  else writeFileSync(file, lines.join(eol))
 }

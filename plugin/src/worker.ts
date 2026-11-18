@@ -5,15 +5,19 @@ import type { OpenSpecState, OpsxStep } from './protocol'
 import { watchFolder, type FolderWatch } from './watch'
 import {
   clearStoreCache,
+  createStore,
   listStores,
   resolveStore,
   runOpenSpecStoreList,
+  runOpenSpecStoreSetup,
+  setStoreLine,
   workspaceStoreId,
   writeStoreLink,
-  type StoreListRunner
+  type StoreListRunner,
+  type StoreSetupRunner
 } from './store'
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 
 export const BOARD_FILE = 'board.openspec'
 
@@ -44,7 +48,14 @@ export const options: {
   readyPollMs: number
   readyTimeoutMs: number
   storeRunner: StoreListRunner
-} = { watchDelayMs: 300, readyPollMs: 500, readyTimeoutMs: 30_000, storeRunner: runOpenSpecStoreList }
+  storeSetupRunner: StoreSetupRunner
+} = {
+  watchDelayMs: 300,
+  readyPollMs: 500,
+  readyTimeoutMs: 30_000,
+  storeRunner: runOpenSpecStoreList,
+  storeSetupRunner: runOpenSpecStoreSetup
+}
 
 /** Agent kinds the New change form offers. */
 export const AGENTS = ['claude', 'codex', 'gemini', 'opencode', 'cursor', 'copilot']
@@ -292,6 +303,33 @@ export default function activate(orca: OrcaWorkerApi): void {
     }
     await writeStoreLink(ws.path, store, options.storeRunner)
     return refresh() // starts watching the store and tells open panels
+  })
+
+  /** The focused local workspace, or an error the panel can show. */
+  const localWorkspace = async () => {
+    const ws = await focused(orca)
+    if (!ws) throw Object.assign(new Error('No workspace is focused.'), { code: 'invalid_params' })
+    if (ws.hostId && ws.hostId !== 'local') {
+      throw Object.assign(new Error('Remote workspaces are not supported yet.'), { code: 'invalid_params' })
+    }
+    return ws
+  }
+  orca.panels.handle('openspec.storeDefaults', async () => ({ parent: dirname((await localWorkspace()).path) }))
+  orca.panels.handle('openspec.setStore', async ({ store }) => {
+    const ws = await localWorkspace()
+    await setStoreLine(ws.path, store, options.storeRunner)
+    clearStoreCache()
+    return refresh()
+  })
+  orca.panels.handle('openspec.createStore', async ({ id, folder, link }) => {
+    const ws = await localWorkspace()
+    await createStore(id, folder, options.storeSetupRunner)
+    if (link) {
+      // A workspace already on a store switches to the new one; one without OpenSpec links to it.
+      if (workspaceStoreId(ws.path)) await setStoreLine(ws.path, id, options.storeRunner)
+      else await writeStoreLink(ws.path, id, options.storeRunner)
+    }
+    return refresh()
   })
 
   /** Opens the board tab; returns a message for the palette or the panel. */

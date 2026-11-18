@@ -33,9 +33,12 @@ function dirs(path: string): string[] {
     .sort()
 }
 
+/** OpenSpec is set up when openspec/ holds a config, changes/ or specs/. A folder holding only
+ *  the board file or a .gitignore (left after unlinking a store) does not count. */
 export function hasOpenSpec(root: string): boolean {
   const dir = join(root, 'openspec')
-  return existsSync(dir) && statSync(dir).isDirectory()
+  if (!existsSync(dir) || !statSync(dir).isDirectory()) return false
+  return ['config.yaml', 'config.yml', 'changes', 'specs'].some((name) => existsSync(join(dir, name)))
 }
 
 export function readChanges(root: string): ChangeInfo[] {

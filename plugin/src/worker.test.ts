@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { assert, mockHost, mountWorker, test } from 'orca/testing'
 import { countTasks, readChanges, readSpecs } from './openspec'
 import { watchFolder } from './watch'
@@ -364,4 +364,45 @@ test('the board needs OpenSpec in the workspace', async () => {
   assert.equal(h.callsOf('editor.open').length, 0)
   assert.equal(existsSync(join(bare, 'openspec')), false)
   await worker.deactivate()
+})
+
+test('creates a store and links a bare workspace to it', async () => {
+  const bare = mkdtempSync(join(tmpdir(), 'bare-'))
+  const storeRoot = fixture()
+  const { clearStoreCache } = await import('./store')
+  clearStoreCache()
+  const ran: string[] = []
+  main.options.storeSetupRunner = async (line) => (ran.push(line), '{}')
+  main.options.storeRunner = async () => JSON.stringify({ stores: [{ id: 'his', root: storeRoot }] })
+  const worker = await mountWorker(main, { host: host(bare) })
+  const parent = mkdtempSync(join(tmpdir(), 'parent-'))
+  const state = (await worker.request('openspec.createStore', {
+    id: 'his',
+    folder: join(parent, 'openspec-his'),
+    link: true
+  })) as { status: string; store?: string }
+  assert.equal(ran.length, 1)
+  assert.equal(state.store, 'his')
+  assert.equal(readFileSync(join(bare, 'openspec', 'config.yaml'), 'utf8'), 'store: his\n')
+  await worker.deactivate()
+  clearStoreCache()
+})
+
+test('switches and unlinks a store-linked workspace', async () => {
+  const ws = mkdtempSync(join(tmpdir(), 'linked-'))
+  mkdirSync(join(ws, 'openspec'))
+  writeFileSync(join(ws, 'openspec', 'config.yaml'), 'store: isotech\n')
+  const { clearStoreCache } = await import('./store')
+  clearStoreCache()
+  main.options.storeRunner = async () =>
+    JSON.stringify({ stores: [{ id: 'isotech', root: fixture() }, { id: 'acme', root: fixture() }] })
+  const worker = await mountWorker(main, { host: host(ws) })
+  const switched = (await worker.request('openspec.setStore', { store: 'acme' })) as { store?: string }
+  assert.equal(switched.store, 'acme')
+  const unlinked = (await worker.request('openspec.setStore', { store: null })) as { status: string }
+  assert.equal(unlinked.status, 'no-openspec')
+  assert.equal(existsSync(join(ws, 'openspec', 'config.yaml')), false)
+  assert.deepEqual(await worker.request('openspec.storeDefaults'), { parent: dirname(ws) })
+  await worker.deactivate()
+  clearStoreCache()
 })

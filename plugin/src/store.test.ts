@@ -80,3 +80,62 @@ test('names the fix for an unknown store or a missing CLI', async () => {
   )
   clearStoreCache()
 })
+
+import { createStore, setStoreLine } from './store'
+import { hasOpenSpec } from './openspec'
+
+test('creates a store with openspec store setup, refusing unsafe input first', async () => {
+  const parent = mkdtempSync(join(tmpdir(), 'stores-'))
+  const ran: string[] = []
+  const run = async (line: string) => (ran.push(line), '{}')
+  const folder = join(parent, 'openspec-his')
+  assert.deepEqual(await createStore('his', folder, run), { id: 'his', root: folder })
+  assert.deepEqual(ran, [`openspec store setup "his" --path "${folder}" --json`])
+
+  await assert.rejects(createStore('bad id', folder, run), /letters, digits/)
+  await assert.rejects(createStore('ok', join(parent, 'a&b'), run), /not allowed/)
+  await assert.rejects(createStore('ok', 'relative/path', run), /full folder path/)
+  await assert.rejects(createStore('ok', parent, run), /already exists/)
+  await assert.rejects(
+    createStore('ok', join(parent, 'new'), async () => {
+      throw new Error('git not found')
+    }),
+    /Creating store "ok" failed: git not found/
+  )
+  assert.equal(ran.length, 1)
+})
+
+function linked(config: string): string {
+  const ws = mkdtempSync(join(tmpdir(), 'ws-'))
+  mkdirSync(join(ws, 'openspec'))
+  writeFileSync(join(ws, 'openspec', 'config.yaml'), config)
+  return ws
+}
+
+test('switches only the store line and keeps the rest of the config', async () => {
+  clearStoreCache()
+  const ws = linked('schema: spec-driven\r\nstore: isotech\r\n# note\r\n')
+  await setStoreLine(ws, 'acme', twoStores)
+  assert.equal(readFileSync(join(ws, 'openspec', 'config.yaml'), 'utf8'), 'schema: spec-driven\r\nstore: acme\r\n# note\r\n')
+  await assert.rejects(setStoreLine(ws, 'missing', twoStores), /not registered/)
+  clearStoreCache()
+})
+
+test('unlinks: removes the store line, deleting a config that held nothing else', async () => {
+  clearStoreCache()
+  const only = linked('store: isotech\n')
+  await setStoreLine(only, null, twoStores)
+  assert.equal(existsSync(join(only, 'openspec', 'config.yaml')), false)
+  writeFileSync(join(only, 'openspec', 'board.openspec'), '#')
+  assert.equal(hasOpenSpec(only), false) // board file alone is not "set up"
+
+  const more = linked('schema: spec-driven\nstore: isotech\n')
+  await setStoreLine(more, null, twoStores)
+  assert.equal(readFileSync(join(more, 'openspec', 'config.yaml'), 'utf8'), 'schema: spec-driven\n')
+  clearStoreCache()
+})
+
+test('a local OpenSpec root cannot change store', async () => {
+  const ws = linked('schema: spec-driven\n')
+  await assert.rejects(setStoreLine(ws, 'acme', twoStores), /not linked to a store/)
+})

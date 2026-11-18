@@ -95,6 +95,146 @@ async function loadStores(): Promise<void> {
   }
 }
 
+/** New-store form and Change store box (panel-only state). */
+const newStoreOpen = atom(false)
+const newStoreId = atom('')
+const newStoreFolder = atom('')
+const folderEdited = atom(false)
+const storeParent = atom<string | null>(null)
+const changeStoreOpen = atom(false)
+const storeBusy = atom(false)
+
+/** `<parent>\openspec-<id>`, using the parent's own path separator. */
+function defaultFolder(id: string): string {
+  const parent = read(storeParent)
+  if (!parent) return ''
+  const sep = parent.includes('\\') ? '\\' : '/'
+  return `${parent.replace(/[\\/]+$/, '')}${sep}openspec-${id || '<id>'}`
+}
+
+async function openNewStore(): Promise<void> {
+  set(newStoreOpen, true)
+  set(newStoreId, '')
+  set(folderEdited, false)
+  try {
+    set(storeParent, (await plugin.request('openspec.storeDefaults')).parent)
+  } catch {
+    set(storeParent, null)
+  }
+  set(newStoreFolder, defaultFolder(''))
+}
+
+async function storeAction(fn: () => Promise<OpenSpecState>): Promise<boolean> {
+  if (read(storeBusy)) return false
+  set(storeBusy, true)
+  set(actionError, null)
+  try {
+    receive(await fn())
+    return true
+  } catch (err) {
+    set(actionError, err instanceof Error ? err.message : String(err))
+    return false
+  } finally {
+    set(storeBusy, false)
+  }
+}
+
+async function createNewStore(): Promise<void> {
+  const id = read(newStoreId).trim()
+  const done = await storeAction(() =>
+    plugin.request('openspec.createStore', { id, folder: read(newStoreFolder), link: true })
+  )
+  if (done) {
+    set(newStoreOpen, false)
+    set(changeStoreOpen, false)
+    void loadStores()
+  }
+}
+
+async function switchStore(store: string | null): Promise<void> {
+  if (await storeAction(() => plugin.request('openspec.setStore', { store }))) set(changeStoreOpen, false)
+}
+
+function NewStoreForm() {
+  const busy = read(storeBusy)
+  return (
+    <Box direction="column" gap="sm" padding="sm">
+      <Text>New store</Text>
+      <Input
+        label="Store id"
+        placeholder="e.g. his"
+        value={read(newStoreId)}
+        disabled={busy}
+        onChange={(v) => {
+          set(newStoreId, v)
+          if (!read(folderEdited)) set(newStoreFolder, defaultFolder(v.trim()))
+        }}
+      />
+      <Input
+        label="Folder"
+        value={read(newStoreFolder)}
+        disabled={busy}
+        onChange={(v) => {
+          set(newStoreFolder, v)
+          set(folderEdited, true)
+        }}
+      />
+      <Row gap="xs">
+        <Button size="sm" variant="solid" tone="accent" disabled={busy || !read(newStoreId).trim()} onPress={createNewStore}>
+          {busy ? 'Creating…' : 'Create store'}
+        </Button>
+        <Button size="sm" variant="ghost" disabled={busy} onPress={() => set(newStoreOpen, false)}>
+          Cancel
+        </Button>
+      </Row>
+      <Text muted size="xs">
+        Runs openspec store setup (a new git repo with a first commit), then links this workspace to it.
+      </Text>
+    </Box>
+  )
+}
+
+function ChangeStoreBox(props: { current: string }) {
+  const stores = (read(storeOptions) ?? []).filter((id) => id !== props.current)
+  const pick = read(storePick)
+  const target = pick && stores.includes(pick) ? pick : stores[0]
+  const busy = read(storeBusy)
+  return (
+    <Box direction="column" gap="sm" padding="sm">
+      <Text>Change store</Text>
+      {stores.length ? (
+        <Row gap="xs">
+          <Select
+            label="Switch to"
+            value={target}
+            options={stores.map((id) => ({ value: id, label: id }))}
+            disabled={busy}
+            onChange={(v) => set(storePick, v)}
+          />
+          <Button size="sm" variant="solid" disabled={busy} onPress={() => switchStore(target)}>
+            Switch
+          </Button>
+        </Row>
+      ) : (
+        <Text muted size="xs">
+          No other stores are registered.
+        </Text>
+      )}
+      <Row gap="xs">
+        <Button size="sm" variant="outline" icon="add" disabled={busy} onPress={openNewStore}>
+          New store
+        </Button>
+        <Button size="sm" variant="outline" tone="danger" disabled={busy} onPress={() => switchStore(null)}>
+          Unlink
+        </Button>
+      </Row>
+      <Text muted size="xs">
+        Switch and Unlink edit only the store: line in openspec/config.yaml.
+      </Text>
+    </Box>
+  )
+}
+
 async function linkStore(): Promise<void> {
   const id = read(storePick)
   if (!id || read(linking)) return
@@ -379,15 +519,28 @@ export function setup(ctx: PanelContext): void {
 function LinkStore() {
   const stores = read(storeOptions)
   if (stores === null) return <Spinner label="Loading stores" />
+  const newStore = read(newStoreOpen) ? (
+    <NewStoreForm />
+  ) : (
+    <Stack gap="xs" align="stretch">
+      <Button variant="outline" icon="add" onPress={openNewStore}>
+        New store
+      </Button>
+    </Stack>
+  )
   if (stores.length === 0)
     return (
-      <Text muted size="xs">
-        No OpenSpec stores are registered on this machine. Register one with `openspec store register &lt;path&gt;`,
-        then press Refresh.
-      </Text>
+      <Stack gap="sm">
+        <Text muted size="xs">
+          No OpenSpec stores are registered on this machine. Create one below, or register an existing one with
+          `openspec store register &lt;path&gt;` and press Refresh.
+        </Text>
+        {newStore}
+      </Stack>
     )
   const busy = read(linking)
   return (
+    <Stack gap="sm">
     <Box direction="column" gap="sm" padding="sm">
       <Text>Or use a store</Text>
       <Select
@@ -406,6 +559,8 @@ function LinkStore() {
         Creates openspec/config.yaml with only a store: line. Nothing else in the project changes.
       </Text>
     </Box>
+    {newStore}
+    </Stack>
   )
 }
 
@@ -424,6 +579,20 @@ function Header(props: { title: string; canCreate: boolean; store?: string }) {
       <Row gap="xs">
         <Heading level={3}>{props.title}</Heading>
         {props.store ? <Badge tone="accent">via store {props.store}</Badge> : null}
+        {props.store ? (
+          <IconButton
+            icon={read(changeStoreOpen) ? 'close' : 'edit'}
+            label={read(changeStoreOpen) ? 'Close change store' : 'Change store'}
+            size="xs"
+            variant="ghost"
+            onPress={() => {
+              const opening = !read(changeStoreOpen)
+              set(changeStoreOpen, opening)
+              set(newStoreOpen, false)
+              if (opening) void loadStores()
+            }}
+          />
+        ) : null}
       </Row>
       <Row gap="xs">
         {props.canCreate ? (
@@ -636,6 +805,9 @@ export default function Panel() {
     <Stack gap="sm">
       <Header title={title} canCreate store={s.store} />
       <UpdatedLine />
+      {s.store && read(changeStoreOpen) ? (
+        read(newStoreOpen) ? <NewStoreForm /> : <ChangeStoreBox current={s.store} />
+      ) : null}
       {view ? <SystemBar prefixes={view.prefixes} /> : null}
       {read(formOpen) ? <NewChangeForm /> : null}
       {errorBox}

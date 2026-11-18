@@ -433,3 +433,60 @@ test('the header board button opens the board', async () => {
   assert.equal(opens, 1)
   await view.unmount()
 })
+
+test('not set up: create a new store and link the workspace to it', async () => {
+  const creates: unknown[] = []
+  const linkedState: OpenSpecState = { status: 'ok', workspace: 'HIS COLIN', store: 'his', changes: [], specs: [] }
+  const host = mockHost({
+    requests: {
+      'openspec.state': bareState,
+      'openspec.stores': { stores: [{ id: 'isotech' }] },
+      'openspec.storeDefaults': { parent: 'C:\\wamp64\\www\\projects' },
+      'openspec.createStore': (input) => (creates.push(input), linkedState)
+    }
+  })
+  const view = await mount(panel, { host })
+  await view.press({ text: 'New store' })
+  await view.type({ label: 'Store id' }, 'his')
+  assert.equal(view.find({ label: 'Folder' })?.props.value, 'C:\\wamp64\\www\\projects\\openspec-his')
+  await view.press({ text: 'Create store' })
+  assert.deepEqual(creates, [{ id: 'his', folder: 'C:\\wamp64\\www\\projects\\openspec-his', link: true }])
+  assert.ok(view.find({ text: 'via store his' }))
+  await view.unmount()
+})
+
+test('store workspace: change store lets you switch or unlink', async () => {
+  const sets: unknown[] = []
+  let current: OpenSpecState = { ...storeState }
+  const host = mockHost({
+    requests: {
+      'openspec.state': () => current,
+      'openspec.systemPrefixes': { prefixes: null },
+      'openspec.stores': { stores: [{ id: 'isotech' }, { id: 'acme' }] },
+      'openspec.setStore': ({ store }) => {
+        sets.push(store)
+        current = store ? { ...storeState, store } : { status: 'no-openspec', workspace: 'COLIN ECLAIMS', changes: [], specs: [] }
+        return current
+      }
+    }
+  })
+  const view = await mount(panel, { host })
+  await view.press({ label: 'Change store' })
+  assert.ok(view.find({ text: 'Change store' }))
+  await view.press({ text: 'Switch' })
+  assert.deepEqual(sets, ['acme'])
+  assert.ok(view.find({ text: 'via store acme' }))
+
+  await view.press({ label: 'Change store' })
+  await view.press({ text: 'Unlink' })
+  assert.deepEqual(sets, ['acme', null])
+  assert.ok(view.find({ label: 'OpenSpec is not set up' }))
+  await view.unmount()
+})
+
+test('local OpenSpec roots have no change-store control', async () => {
+  const { host } = setupHost()
+  const view = await mount(panel, { host })
+  assert.equal(view.find({ label: 'Change store' }), null)
+  await view.unmount()
+})
