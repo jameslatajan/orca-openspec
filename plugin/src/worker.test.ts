@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { assert, mockHost, mountWorker, test } from 'orca/testing'
@@ -56,7 +56,7 @@ test('counts task boxes the way OpenSpec does', () => {
 test('reads changes and nested specs, skipping archive', () => {
   const root = fixture()
   assert.deepEqual(readChanges(root), [
-    { name: 'add-auth', done: 3, total: 5 },
+    { name: 'add-auth', done: 3, total: 5, next: 'd' },
     { name: 'no-tasks', done: 0, total: null }
   ])
   assert.deepEqual(readSpecs(root), ['auth', 'billing/invoices'])
@@ -106,7 +106,7 @@ test('posts fresh state once when a task is ticked on disk', async () => {
   const posts = worker.posts.slice(before).filter((p) => p.event === 'openspec.changed')
   assert.equal(posts.length, 1)
   const state = posts[0].payload as { changes: { name: string; done: number; total: number }[] }
-  assert.deepEqual(state.changes[0], { name: 'add-auth', done: 4, total: 5 })
+  assert.deepEqual(state.changes[0], { name: 'add-auth', done: 4, total: 5, next: 'e' })
   await worker.deactivate()
   main.options.watchDelayMs = 300
 })
@@ -333,5 +333,35 @@ test('saves and returns system prefixes per workspace', async () => {
   })
   assert.deepEqual(await worker.request('openspec.systemPrefixes'), { prefixes: ['eclaims', 'ess'] })
   assert.deepEqual(h.data().storage['systemPrefixes:w1'], ['eclaims', 'ess'])
+  await worker.deactivate()
+})
+
+test('reads the next unchecked task', async () => {
+  const { nextTask } = await import('./openspec')
+  assert.equal(nextTask('- [x] 1.1 done\n- [ ] 1.2 Add the route\n- [ ] 1.3 later'), '1.2 Add the route')
+  assert.equal(nextTask('- [x] a\n- [X] b'), undefined)
+  assert.equal(nextTask('no tasks here'), undefined)
+})
+
+test('opens the board: creates the file once and gitignores it once', async () => {
+  const root = fixture()
+  const h = host(root, { agent: 'claude' }, { 'editor.open': { opened: true } })
+  const worker = await mountWorker(main, { host: h })
+  assert.deepEqual(await worker.request('openspec.openBoard'), { opened: true, message: 'Opened the OpenSpec board' })
+  await worker.request('openspec.openBoard')
+  assert.ok(readFileSync(join(root, 'openspec', 'board.openspec'), 'utf8').startsWith('#'))
+  assert.equal(readFileSync(join(root, 'openspec', '.gitignore'), 'utf8'), 'board.openspec\n')
+  assert.deepEqual(h.callsOf('editor.open')[0], { workspaceId: 'w1', path: 'openspec/board.openspec' })
+  await worker.deactivate()
+})
+
+test('the board needs OpenSpec in the workspace', async () => {
+  const bare = mkdtempSync(join(tmpdir(), 'bare-'))
+  const h = host(bare, { agent: 'claude' }, { 'editor.open': { opened: true } })
+  const worker = await mountWorker(main, { host: h })
+  const res = (await worker.request('openspec.openBoard')) as { opened: boolean }
+  assert.equal(res.opened, false)
+  assert.equal(h.callsOf('editor.open').length, 0)
+  assert.equal(existsSync(join(bare, 'openspec')), false)
   await worker.deactivate()
 })

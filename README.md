@@ -14,6 +14,11 @@ An [Orca](https://github.com/stablyai/orca) plugin for [OpenSpec](https://github
 - **Palette commands:** `OpenSpec: New change`, `Apply change`, `Verify change`, `Archive change` and `Refresh panel`. Apply, Verify and Archive use the change selected in the panel, or the only change if there is just one.
 - **Auto-refresh:** the panel updates about 300 ms after files in `openspec/` change, when you switch workspace, and when an agent the plugin started finishes.
 - **OpenSpec stores:** if a workspace's `openspec/config.yaml` says `store: <id>`, the panel shows that store's changes and specs (from the folder `openspec store list` registers for `<id>`), labels the header "via store <id>", and watches the store for edits. Press Refresh after registering or moving a store.
+- **Board tab:** "OpenSpec: Open board" (palette) or the board button in the panel header opens a full-size Kanban board in the main area.
+  - Columns: Planning, Not started, In progress, Ready to archive.
+  - Cards show progress and the next task; select one for Apply and Verify, or Archive once it's ready.
+  - A searchable specs list sits at the side.
+  - It's backed by `openspec/board.openspec`, which is created on first open and added to `openspec/.gitignore`.
 - **Link to a store:** in a workspace without OpenSpec, the "not set up" screen also offers **Or use a store**: pick a registered store and press **Link store**. That creates `openspec/config.yaml` with just `store: <id>`, never overwriting an existing config. With no stores registered, the screen shows the `openspec store register <path>` command instead.
 - **This system / All:** a shared store can hold many systems' items. In a store workspace, **This system** shows only the items whose name starts with your system's prefix (`eclaims-…`), then a **Shared** section for items with no common system prefix. The prefixes are guessed from the workspace name ("COLIN ECLAIMS" → `eclaims`); use **Edit system** to change them, for example `eclaims, ess`. **All** shows everything.
 - **Init OpenSpec:** in a workspace without an `openspec/` folder, a button opens a terminal running `openspec init`.

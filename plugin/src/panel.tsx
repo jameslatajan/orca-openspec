@@ -436,6 +436,15 @@ function Header(props: { title: string; canCreate: boolean; store?: string }) {
             onPress={() => (read(formOpen) ? closeForm() : openForm())}
           />
         ) : null}
+        {props.canCreate ? (
+          <IconButton
+            icon="layers"
+            label="Open board"
+            size="sm"
+            variant="ghost"
+            onPress={() => call(() => plugin.request('openspec.openBoard'))}
+          />
+        ) : null}
         {read(refreshing) ? (
           <Spinner label="Refreshing" labelHidden />
         ) : (

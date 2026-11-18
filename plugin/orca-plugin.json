@@ -25,7 +25,17 @@
       { "id": "openspec.apply", "title": "OpenSpec: Apply change", "when": "workspace" },
       { "id": "openspec.verify", "title": "OpenSpec: Verify change", "when": "workspace" },
       { "id": "openspec.archive", "title": "OpenSpec: Archive change", "when": "workspace" },
-      { "id": "openspec.refresh", "title": "OpenSpec: Refresh panel", "when": "workspace" }
+      { "id": "openspec.refresh", "title": "OpenSpec: Refresh panel", "when": "workspace" },
+      { "id": "openspec.openBoard", "title": "OpenSpec: Open board", "when": "workspace" }
+    ],
+    "customEditors": [
+      {
+        "id": "board",
+        "title": "OpenSpec board",
+        "extensions": [".openspec"],
+        "entry": "board/main.ts",
+        "frame": "isolated"
+      }
     ],
     "events": [{ "on": "workspace.changed" }, { "on": "agent.status.changed" }],
     "settings": [

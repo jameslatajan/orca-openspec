@@ -42,6 +42,11 @@ The authoritative plugin API reference ships with the CLI. Read it instead of gu
   - a debounced recursive `fs.watch` on `openspec/` (`src/watch.ts`).
   `retarget()` keeps one module-level watcher and skips a retarget when the path is unchanged; `deactivate()` closes it.
 - **Stores:** `src/store.ts` reads a top-level `store: <id>` from the workspace's `openspec/config.yaml`, then resolves it with `openspec store list --json`. The listing is cached; only the Refresh button and the palette Refresh clear it, because `workspace.changed` fires on every terminal open or close. `dataRootOf()` returns the store root or the workspace, and both reading and watching use it. Tests inject `options.storeRunner`.
+- **Board tab:** Orca places plugin panels only in the right sidebar, so the board is a custom editor for `*.openspec`.
+  - `board/main.ts` is plain DOM: editors get no Orca components. It talks to the worker through `orca.plugin.request` / `orca.plugin.on`, and is styled with `--orca-*` CSS variables.
+  - It imports `../src/view.ts`, so it classifies changes exactly as the panel does.
+  - `openBoard()` in the worker requires `openspec/`, creates `openspec/board.openspec` (with `wx`), adds it to `openspec/.gitignore` once, then calls `editor.open`.
+  - The board isn't covered by the panel test kit, so check it live, or with `orca plugin shot <key> --editor <file>`.
 - **Linking a store:** the OpenSpec CLI has no link command, so `writeStoreLink()` in `store.ts` creates `openspec/config.yaml` itself.
   - It checks the id against `^[A-Za-z0-9._-]+$` and the registered stores, then writes with the `wx` flag. It refuses when `config.yaml` or `config.yml` exists.
   - Worker requests: `openspec.stores` (clears the cache first) and `openspec.linkStore`, which writes the file, then calls `refresh()`.
@@ -56,6 +61,7 @@ The authoritative plugin API reference ships with the CLI. Read it instead of gu
 
 - `engines.orca` must be ≥ the newest `Since` of anything used. It is `>=1.4.248` because a capability requires it, and `plugin check` fails if it is lower.
 - Adding a capability, command or event changes the approval fingerprint. The user must re-approve the plugin (`orca plugin dev load ./plugin --approve <fingerprint>`), so never approve on their behalf. Code-only edits reload without approval.
+- After changing `orca-plugin.json` (commands, editors, events), run `orca plugin dev reload ./plugin`. `dev load` can report `ok` while Orca keeps the old manifest. A command the worker registers but the old manifest lacks makes Orca drop events, shown in `orca plugin logs` as "registered undeclared command".
 - `<Progress value>` is 0–100, not 0–1.
 - After a panel test waits on a timer (for example the Refresh spinner's 500 ms minimum), call `await view.settled()` before `find`; otherwise the view still shows the old render.
 - A `<Select>` option with value `''` makes the Select silently not render; use a real value such as `'default'`.

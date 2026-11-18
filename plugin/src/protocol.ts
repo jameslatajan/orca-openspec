@@ -20,6 +20,8 @@ declare module 'orca' {
     'openspec.setSystemPrefixes': { input: { prefixes: string[] }; output: { prefixes: string[] } }
     /** Opens a terminal running `openspec init` in the focused workspace. */
     'openspec.init': { output: { terminalId: string } }
+    /** Creates openspec/board.openspec if needed and opens the board in a main editor tab. */
+    'openspec.openBoard': { output: { opened: boolean; message: string } }
     /** The OpenSpec stores registered on this machine. */
     'openspec.stores': { output: { stores: { id: string }[] } }
     /** Links the focused workspace to a store (creates openspec/config.yaml) and answers fresh state. */
@@ -35,7 +37,13 @@ declare module 'orca' {
 
 export type OpsxStep = 'explore' | 'propose' | 'apply' | 'verify' | 'archive'
 
-export type ChangeInfo = { name: string; done: number; total: number | null }
+export type ChangeInfo = {
+  name: string
+  done: number
+  total: number | null
+  /** The first unchecked task's text, when there is one (shown on the board). */
+  next?: string
+}
 
 export type OpenSpecState = {
   status: 'no-workspace' | 'no-openspec' | 'remote' | 'ok' | 'error'

@@ -18,6 +18,14 @@ export function countTasks(text: string): { done: number; total: number } {
   return { done, total }
 }
 
+/** The text of the first task box that isn't checked (`- [ ] 3.1 Do it` → `3.1 Do it`), if any. */
+export function nextTask(text: string): string | undefined {
+  for (const line of text.split(/\r?\n/)) {
+    if (BOX.test(line) && !DONE.test(line)) return line.replace(BOX, '').trim() || undefined
+  }
+  return undefined
+}
+
 function dirs(path: string): string[] {
   return readdirSync(path, { withFileTypes: true })
     .filter((e) => e.isDirectory())
@@ -38,7 +46,9 @@ export function readChanges(root: string): ChangeInfo[] {
     .map((name) => {
       const tasks = join(base, name, 'tasks.md')
       if (!existsSync(tasks)) return { name, done: 0, total: null }
-      return { name, ...countTasks(readFileSync(tasks, 'utf8')) }
+      const text = readFileSync(tasks, 'utf8')
+      const next = nextTask(text)
+      return next ? { name, ...countTasks(text), next } : { name, ...countTasks(text) }
     })
 }
 

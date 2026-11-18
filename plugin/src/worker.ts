@@ -12,7 +12,29 @@ import {
   writeStoreLink,
   type StoreListRunner
 } from './store'
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+
+export const BOARD_FILE = 'board.openspec'
+
+/** Makes sure `<workspace>/openspec/board.openspec` exists and is gitignored. Never overwrites. */
+export function ensureBoardFile(workspacePath: string): string {
+  const dir = join(workspacePath, 'openspec')
+  const file = join(dir, BOARD_FILE)
+  if (!existsSync(file)) {
+    try {
+      writeFileSync(file, '# Opens the OpenSpec board in Orca. Safe to delete.\n', { flag: 'wx' })
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err
+    }
+  }
+  const ignore = join(dir, '.gitignore')
+  const current = existsSync(ignore) ? readFileSync(ignore, 'utf8') : ''
+  if (!current.split(/\r?\n/).some((line) => line.trim() === BOARD_FILE)) {
+    appendFileSync(ignore, (current && !current.endsWith('\n') ? '\n' : '') + BOARD_FILE + '\n')
+  }
+  return file
+}
 
 /** The live watcher on the focused workspace's openspec/ folder, if any. */
 let current: FolderWatch | null = null
@@ -271,6 +293,28 @@ export default function activate(orca: OrcaWorkerApi): void {
     await writeStoreLink(ws.path, store, options.storeRunner)
     return refresh() // starts watching the store and tells open panels
   })
+
+  /** Opens the board tab; returns a message for the palette or the panel. */
+  const openBoard = async (): Promise<{ opened: boolean; message: string }> => {
+    const ws = await focused(orca)
+    if (!ws) return { opened: false, message: 'Focus a workspace first.' }
+    if (ws.hostId && ws.hostId !== 'local') return { opened: false, message: 'Remote workspaces are not supported yet.' }
+    if (!hasOpenSpec(ws.path)) {
+      const message = 'Set up OpenSpec in this workspace first (Init OpenSpec or Link store in the panel).'
+      await orca.host.call('notifications.show', { title: 'OpenSpec', body: message })
+      return { opened: false, message }
+    }
+    const file = ensureBoardFile(ws.path)
+    try {
+      await orca.host.call('editor.open', { workspaceId: ws.workspaceId, path: `openspec/${BOARD_FILE}` })
+    } catch {
+      await orca.host.call('editor.open', { workspaceId: ws.workspaceId, path: file }) // some hosts want an absolute path
+    }
+    return { opened: true, message: 'Opened the OpenSpec board' }
+  }
+  orca.panels.handle('openspec.openBoard', () => openBoard())
+  orca.commands.register('openspec.openBoard', async () => (await openBoard()).message)
+
   orca.panels.handle('openspec.init', async () => {
     const ws = await focused(orca)
     if (!ws) throw Object.assign(new Error('No workspace is focused.'), { code: 'invalid_params' })

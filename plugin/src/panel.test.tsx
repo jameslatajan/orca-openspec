@@ -424,3 +424,12 @@ test('local workspaces show no system bar', async () => {
   assert.equal(view.find({ text: 'This system' }), null)
   await view.unmount()
 })
+
+test('the header board button opens the board', async () => {
+  let opens = 0
+  const { host } = setupHost({ 'openspec.openBoard': () => (opens++, { opened: true, message: 'Opened the OpenSpec board' }) })
+  const view = await mount(panel, { host })
+  await view.press({ label: 'Open board' })
+  assert.equal(opens, 1)
+  await view.unmount()
+})
