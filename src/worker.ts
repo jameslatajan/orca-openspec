@@ -1,6 +1,16 @@
 // The plugin's worker: reads openspec/ for the focused workspace and launches OpenSpec agents.
 import type { OrcaWorkerApi } from 'orca/worker'
-import { hasOpenSpec, readChanges, readSpecs } from './openspec'
+import {
+  changeFiles,
+  hasOpenSpec,
+  readArchived,
+  readChange,
+  readChanges,
+  readSpecs,
+  resolveInside,
+  specIndex,
+  type SpecUse
+} from './openspec'
 import type { OpenSpecState, OpsxStep } from './protocol'
 import { watchFolder, type FolderWatch } from './watch'
 import {
@@ -17,7 +27,7 @@ import {
   type StoreSetupRunner
 } from './store'
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { dirname, isAbsolute, join, relative } from 'node:path'
 
 export const BOARD_FILE = 'board.openspec'
 
@@ -199,11 +209,15 @@ async function launchVisible(
   return terminalId
 }
 
+/** Spec → changes map for the current data root; cleared whenever state is posted. */
+let specIndexCache: { root: string; index: Map<string, SpecUse[]> } | null = null
+
 export default function activate(orca: OrcaWorkerApi): void {
   /** Terminals of agents this plugin launched; their `done` triggers a refresh. */
   const launched = new Set<string>()
 
   const post = async (): Promise<OpenSpecState> => {
+    specIndexCache = null // files may have moved (watcher, refresh, agent done)
     const state = await readState(orca)
     orca.panels.post('openspec.changed', state)
     return state
@@ -352,6 +366,62 @@ export default function activate(orca: OrcaWorkerApi): void {
   }
   orca.panels.handle('openspec.openBoard', () => openBoard())
   orca.commands.register('openspec.openBoard', async () => (await openBoard()).message)
+
+  /** The focused local workspace's OpenSpec data root, or an error the board can show. */
+  const dataRoot = async () => {
+    const ws = await localWorkspace()
+    if (!hasOpenSpec(ws.path)) throw Object.assign(new Error('This workspace has no OpenSpec.'), { code: 'invalid_params' })
+    const { root } = await dataRootOf(ws.path)
+    return { ws, root }
+  }
+  const indexFor = async (): Promise<Map<string, SpecUse[]>> => {
+    const { root } = await dataRoot()
+    if (!specIndexCache || specIndexCache.root !== root) specIndexCache = { root, index: specIndex(root) }
+    return specIndexCache.index
+  }
+  orca.panels.handle('openspec.promptFor', async ({ step, change }) => ({
+    prompt: promptFor(step, change, commandStyleOf(await orca.settings.get('commandStyle')))
+  }))
+  orca.panels.handle('openspec.archived', async ({ offset, limit, filter }) => {
+    const { root } = await dataRoot()
+    return readArchived(root, Number(offset) || 0, Math.min(Math.max(Number(limit) || 0, 0), 200), filter ?? '')
+  })
+  orca.panels.handle('openspec.changeFiles', async ({ folder, archived }) => {
+    const { root } = await dataRoot()
+    const { files, specs } = changeFiles(root, folder, archived)
+    const index = await indexFor()
+    const seen = new Set<string>([`${archived}:${folder}`])
+    const related: SpecUse[] = []
+    for (const spec of specs) {
+      for (const use of index.get(spec) ?? []) {
+        const key = `${use.archived}:${use.folder}`
+        if (seen.has(key)) continue
+        seen.add(key)
+        related.push(use)
+      }
+    }
+    const m = /^(\d{4}-\d{2}-\d{2})-(.+)$/.exec(folder)
+    const dir = join(root, 'openspec', 'changes', ...(archived ? ['archive', folder] : [folder]))
+    const info = archived && m ? readChange(dir, m[2], m[1]) : readChange(dir, folder)
+    return { info, files, specs, related }
+  })
+  orca.panels.handle('openspec.specInfo', async ({ spec }) => ({ changes: (await indexFor()).get(spec) ?? [] }))
+  orca.panels.handle('openspec.readFile', async ({ path }) => {
+    const { root } = await dataRoot()
+    return { text: readFileSync(resolveInside(root, path), 'utf8') }
+  })
+  orca.panels.handle('openspec.openFile', async ({ path }) => {
+    const { ws, root } = await dataRoot()
+    const file = resolveInside(root, path)
+    const rel = relative(ws.path, file).replace(/\\/g, '/')
+    const inWorkspace = rel && !rel.startsWith('..') && !isAbsolute(rel)
+    try {
+      await orca.host.call('editor.open', { workspaceId: ws.workspaceId, path: inWorkspace ? rel : file })
+    } catch {
+      await orca.host.call('editor.open', { workspaceId: ws.workspaceId, path: file }) // some hosts want an absolute path
+    }
+    return { opened: true }
+  })
 
   orca.panels.handle('openspec.init', async () => {
     const ws = await focused(orca)

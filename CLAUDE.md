@@ -45,6 +45,10 @@ The authoritative plugin API reference ships with the CLI. Read it instead of gu
 - **Board tab:** Orca places plugin panels only in the right sidebar, so the board is a custom editor for `*.openspec`.
   - `board/main.ts` is plain DOM: editors get no Orca components. It talks to the worker through `orca.plugin.request` / `orca.plugin.on`, and is styled with `--orca-*` CSS variables.
   - It imports `../src/view.ts`, so it classifies changes exactly as the panel does.
+  - Views: board, change detail, spec detail (module-level `current`, bumped `navSeq` drops stale responses). File contents come on demand through `openspec.changeFiles`, `openspec.readFile`, `openspec.specInfo` and `openspec.archived`; `resolveInside()` in `src/openspec.ts` refuses anything but `.md` under `openspec/`.
+  - `board/markdown.ts` renders markdown with text nodes only (never innerHTML); it has node tests. Its checkbox class is `chk`, because `.box` is the side-panel card style.
+  - Live updates must not redraw unchanged DOM: `renderBoard`/`renderSpecs` skip identical redraws and `receive()` reloads a change page only when that change changed, or clicks get swallowed while an agent edits files.
+  - Only Archive confirms on the board (dialog shows the `openspec.promptFor` command); the sidebar never confirms.
   - `openBoard()` in the worker requires `openspec/`, creates `openspec/board.openspec` (with `wx`), adds it to `openspec/.gitignore` once, then calls `editor.open`.
   - The board isn't covered by the panel test kit, so check it live, or with `orca plugin shot <key> --editor <file>`.
 - **Creating and changing stores:**

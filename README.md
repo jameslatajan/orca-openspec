@@ -15,9 +15,12 @@ An [Orca](https://github.com/stablyai/orca) plugin for [OpenSpec](https://github
 - **Auto-refresh:** the panel updates about 300 ms after files in `openspec/` change, when you switch workspace, and when an agent the plugin started finishes.
 - **OpenSpec stores:** if a workspace's `openspec/config.yaml` says `store: <id>`, the panel shows that store's changes and specs (from the folder `openspec store list` registers for `<id>`), labels the header "via store <id>", and watches the store for edits. Press Refresh after registering or moving a store.
 - **Board tab:** "OpenSpec: Open board" (palette) or the board button in the panel header opens a full-size Kanban board in the main area.
-  - Columns: Planning, Not started, In progress, Ready to archive.
-  - Cards show progress and the next task; select one for Apply and Verify, or Archive once it's ready.
-  - A searchable specs list sits at the side.
+  - Columns: Planning, Not started, In progress, Ready to archive and Archived. Archived starts collapsed and loads 40 changes at a time as you scroll.
+  - Cards show the first sentence of the proposal's Why, progress, the date and the next task. Hover a card for quick actions: Apply, Verify, or Archive once it's ready.
+  - **Click a card** to open the change: its status and progress, the specs it touches, and tabs for `proposal.md`, `design.md`, `tasks.md`, any other notes in the change folder, and each spec delta, shown as formatted text. **Edit ↗** opens the file in Orca's editor. A side box lists related changes (active or archived) that touch the same specs. Archived changes open read-only.
+  - **Specs** in the header opens a searchable list; click a spec to read it and see which changes touched it.
+  - Apply, Verify and Explore start at once. **Archive** first asks, shows the command it will send, and warns when tasks are unfinished.
+  - Go back with **← Board**, the breadcrumb, the title, or Esc.
   - It's backed by `openspec/board.openspec`, which is created on first open and added to `openspec/.gitignore`.
 - **New store:** **New store** (on the "not set up" screen, or under Change store) runs `openspec store setup <id> --path <folder>`, which makes a new git repo with a first commit, then links the workspace to it. The folder defaults to `openspec-<id>` next to your project.
 - **Change store:** in a store workspace, the pencil next to "via store …" opens **Store settings**: edit the system prefixes, **Switch** to another registered store, **Unlink**, or create a **New store**. Both edit only the `store:` line. Unlinking deletes `config.yaml` if that was all it held, and the panel then offers Init / Link store again. Workspaces with their own local OpenSpec can't switch.

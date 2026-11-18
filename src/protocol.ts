@@ -32,6 +32,24 @@ declare module 'orca' {
     'openspec.setStore': { input: { store: string | null }; output: OpenSpecState }
     /** Creates and registers a store; with `link`, links or switches the workspace to it. */
     'openspec.createStore': { input: { id: string; folder: string; link: boolean }; output: OpenSpecState }
+    /** The exact prompt `openspec.launch` would type for this step and change (Command style aware). */
+    'openspec.promptFor': { input: { step: OpsxStep; change: string }; output: { prompt: string } }
+    /** A page of archived changes, newest first. */
+    'openspec.archived': {
+      input: { offset: number; limit: number; filter?: string }
+      output: { items: ArchivedInfo[]; total: number }
+    }
+    /** A change's markdown files (paths relative to openspec/), touched specs and related changes. */
+    'openspec.changeFiles': {
+      input: { folder: string; archived: boolean }
+      output: { info: ChangeInfo; files: ChangeFileInfo[]; specs: string[]; related: SpecUseInfo[] }
+    }
+    /** The changes (active and archived) that carry a delta for `spec`. */
+    'openspec.specInfo': { input: { spec: string }; output: { changes: SpecUseInfo[] } }
+    /** Reads a markdown file under openspec/ (path relative to it). */
+    'openspec.readFile': { input: { path: string }; output: { text: string } }
+    /** Opens a markdown file under openspec/ in a main-area editor tab. */
+    'openspec.openFile': { input: { path: string }; output: { opened: boolean } }
   }
   interface PluginPanelEvents {
     /** Fresh state after a workspace switch, a launched agent finishing, or a refresh. */
@@ -49,7 +67,19 @@ export type ChangeInfo = {
   total: number | null
   /** The first unchecked task's text, when there is one (shown on the board). */
   next?: string
+  /** The first sentence of proposal.md's Why section. */
+  summary?: string
+  /** YYYY-MM-DD: `created` from .openspec.yaml, or an archived folder's date prefix. */
+  created?: string
 }
+
+/** An archived change; `folder` is the real folder name under changes/archive/. */
+export type ArchivedInfo = ChangeInfo & { folder: string }
+
+export type ChangeFileInfo = { path: string; group: 'docs' | 'other' | 'delta'; label: string }
+
+/** A change that carries a delta for a spec. */
+export type SpecUseInfo = { name: string; folder: string; archived: boolean }
 
 export type OpenSpecState = {
   status: 'no-workspace' | 'no-openspec' | 'remote' | 'ok' | 'error'

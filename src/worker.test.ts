@@ -406,3 +406,53 @@ test('switches and unlinks a store-linked workspace', async () => {
   await worker.deactivate()
   clearStoreCache()
 })
+
+test('board: explore a change sends its name in both command styles', async () => {
+  for (const [style, want] of [['skill', '/openspec-explore add-auth'], ['opsx', '/opsx:explore add-auth']] as const) {
+    const h = host(fixture(), { agent: 'claude', commandStyle: style })
+    const worker = await mountWorker(main, { host: h })
+    await worker.request('openspec.launch', { step: 'explore', change: 'add-auth' })
+    assert.deepEqual(sent(h), [want])
+    await worker.deactivate()
+  }
+})
+
+test('board: archived pages, change files, spec info and related changes', async () => {
+  const root = fixture()
+  const w = (rel: string, text: string): void => {
+    mkdirSync(join(root, rel, '..'), { recursive: true })
+    writeFileSync(join(root, rel), text)
+  }
+  w('openspec/changes/add-auth/proposal.md', '## Why\nLogin is missing.\n')
+  w('openspec/changes/add-auth/specs/auth/spec.md', '## ADDED Requirements\n')
+  w('openspec/changes/archive/2026-10-01-first-auth/specs/auth/spec.md', '#')
+  const worker = await mountWorker(main, { host: host(root) })
+  const page = (await worker.request('openspec.archived', { offset: 0, limit: 40 })) as { total: number; items: { name: string }[] }
+  assert.deepEqual([page.total, page.items.map((i) => i.name)], [2, ['first-auth', 'old']])
+  const files = (await worker.request('openspec.changeFiles', { folder: 'add-auth', archived: false })) as {
+    files: { label: string }[]
+    specs: string[]
+    related: { name: string; archived: boolean }[]
+  }
+  assert.deepEqual(files.files.map((f) => f.label), ['proposal.md', 'tasks.md', 'auth'])
+  assert.deepEqual(files.related, [{ name: 'first-auth', folder: '2026-10-01-first-auth', archived: true }])
+  assert.equal(((await worker.request('openspec.specInfo', { spec: 'auth' })) as { changes: unknown[] }).changes.length, 2)
+  assert.equal(
+    ((await worker.request('openspec.readFile', { path: 'changes/add-auth/proposal.md' })) as { text: string }).text,
+    '## Why\nLogin is missing.\n'
+  )
+  await worker.deactivate()
+})
+
+test('board: file reads and opens are refused outside openspec/', async () => {
+  const root = fixture()
+  writeFileSync(join(root, 'secret.md'), 'no')
+  const h = host(root, { agent: 'claude' }, { 'editor.open': { opened: true } })
+  const worker = await mountWorker(main, { host: h })
+  await assert.rejects(worker.request('openspec.readFile', { path: '../secret.md' }))
+  await assert.rejects(worker.request('openspec.openFile', { path: 'changes/../../secret.md' }))
+  assert.equal(h.callsOf('editor.open').length, 0)
+  assert.deepEqual(await worker.request('openspec.openFile', { path: 'specs/auth/spec.md' }), { opened: true })
+  assert.deepEqual(h.callsOf('editor.open')[0], { workspaceId: 'w1', path: 'openspec/specs/auth/spec.md' })
+  await worker.deactivate()
+})
