@@ -1,6 +1,6 @@
 ## Why
 
-Store workspaces can hold hundreds of specs (333 in the isotech store, 125 for eclaims plus Shared). The Specs tab draws every row at once, which is slow and long to scroll.
+Store workspaces can hold hundreds of specs (333 in the teamstore store, 125 for claims plus Shared). The Specs tab draws every row at once, which is slow and long to scroll.
 
 ## What Changes
 

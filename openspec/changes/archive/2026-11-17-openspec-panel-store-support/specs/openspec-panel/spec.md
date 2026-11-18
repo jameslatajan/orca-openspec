@@ -4,8 +4,8 @@
 When the focused workspace's `openspec/config.yaml` (or `config.yml`) declares a top-level `store: <id>`, the panel SHALL read changes and specs from that store's `openspec/` folder instead of the workspace's, resolving `<id>` to a folder through `openspec store list --json`. The panel header SHALL show "via store <id>". Auto-refresh SHALL watch the store's `openspec/` folder. The store list SHALL be looked up once per plugin run and again when the user presses Refresh. Agent actions are unchanged: they still start in the focused workspace. Workspaces without a `store:` line SHALL behave as before.
 
 #### Scenario: Workspace linked to a store
-- **WHEN** `colin_eclaims/openspec/config.yaml` contains `store: isotech` and `isotech` is registered at `C:\wamp64\www\projects\openspec-store`
-- **THEN** the panel lists the changes and specs under `C:\wamp64\www\projects\openspec-store\openspec` and shows "via store isotech"
+- **WHEN** `acme-claims/openspec/config.yaml` contains `store: teamstore` and `teamstore` is registered at `C:\projects\openspec-store`
+- **THEN** the panel lists the changes and specs under `C:\projects\openspec-store\openspec` and shows "via store teamstore"
 
 #### Scenario: Unknown store
 - **WHEN** the config declares `store: missing` and no store with that id is registered

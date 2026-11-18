@@ -130,8 +130,8 @@ The panel SHALL show an empty state with an Init OpenSpec action when the worksp
 When the focused workspace's `openspec/config.yaml` (or `config.yml`) declares a top-level `store: <id>`, the panel SHALL read changes and specs from that store's `openspec/` folder instead of the workspace's, resolving `<id>` to a folder through `openspec store list --json`. The panel header SHALL show "via store <id>". Auto-refresh SHALL watch the store's `openspec/` folder. The store list SHALL be looked up once per plugin run and again when the user presses Refresh. Agent actions are unchanged: they still start in the focused workspace. Workspaces without a `store:` line SHALL behave as before.
 
 #### Scenario: Workspace linked to a store
-- **WHEN** `colin_eclaims/openspec/config.yaml` contains `store: isotech` and `isotech` is registered at `C:\wamp64\www\projects\openspec-store`
-- **THEN** the panel lists the changes and specs under `C:\wamp64\www\projects\openspec-store\openspec` and shows "via store isotech"
+- **WHEN** `acme-claims/openspec/config.yaml` contains `store: teamstore` and `teamstore` is registered at `C:\projects\openspec-store`
+- **THEN** the panel lists the changes and specs under `C:\projects\openspec-store\openspec` and shows "via store teamstore"
 
 #### Scenario: Unknown store
 - **WHEN** the config declares `store: missing` and no store with that id is registered
@@ -164,15 +164,15 @@ Pressing Refresh SHALL show a spinning indicator in place of the refresh button 
 In a store-linked workspace, the panel SHALL offer a single scope dropdown with this system (labelled with its prefixes) and "All systems", defaulting to this system. A workspace's system is a list of name prefixes, remembered per workspace and editable in the store settings box. The default list is the workspace-name words that match a known store prefix. A known prefix is the text before the first `-` in a change or spec name, shared by at least 3 store items. In this-system mode, the Changes and Specs tabs SHALL list items whose prefix is in the list, then a "Shared" section with items whose prefix is not known; tab counts SHALL include only those. Workspaces without a store SHALL be unchanged.
 
 #### Scenario: Default system from the workspace name
-- **WHEN** the workspace "COLIN ECLAIMS" is linked to a store whose items include at least 3 named `eclaims-…`
-- **THEN** its prefix list defaults to `eclaims`, and the Changes tab lists only the `eclaims-…` changes plus the Shared ones
+- **WHEN** the workspace "ACME CLAIMS" is linked to a store whose items include at least 3 named `claims-…`
+- **THEN** its prefix list defaults to `claims`, and the Changes tab lists only the `claims-…` changes plus the Shared ones
 
 #### Scenario: Shared items
 - **WHEN** the store has a spec `access-control` and fewer than 3 items start with `access-`
 - **THEN** in this-system mode `access-control` appears under "Shared"
 
 #### Scenario: Other systems hidden
-- **WHEN** this-system mode is on with prefixes `eclaims`
+- **WHEN** this-system mode is on with prefixes `claims`
 - **THEN** `ess-ldna-print` and `doh-…` items are not listed
 
 #### Scenario: All mode
@@ -180,15 +180,15 @@ In a store-linked workspace, the panel SHALL offer a single scope dropdown with 
 - **THEN** every store change and spec is listed, as before
 
 #### Scenario: Edit the system
-- **WHEN** the user sets the prefixes to `eclaims, ess` in the store settings box
+- **WHEN** the user sets the prefixes to `claims, ess` in the store settings box
 - **THEN** items of both systems are listed, and the list is remembered for this workspace
 
 ### Requirement: Link a workspace to a store
 When the focused workspace has no `openspec/` folder, the "not set up" screen SHALL offer, next to Init OpenSpec, a dropdown of the stores registered on this machine and a Link store button. Linking SHALL create `openspec/config.yaml` containing `store: <id>` and then reload the panel. The plugin SHALL never overwrite an existing config. With no stores registered, the screen SHALL say so and show the `openspec store register <path>` command instead of the dropdown.
 
 #### Scenario: Link to a registered store
-- **WHEN** HIS COLIN has no `openspec/` folder, the user picks `isotech` and presses Link store
-- **THEN** `openspec/config.yaml` is created with `store: isotech`, and the panel shows the isotech store's items with "via store isotech"
+- **WHEN** ACME HR has no `openspec/` folder, the user picks `teamstore` and presses Link store
+- **THEN** `openspec/config.yaml` is created with `store: teamstore`, and the panel shows the teamstore store's items with "via store teamstore"
 
 #### Scenario: Existing config is kept
 - **WHEN** `openspec/config.yaml` already exists at link time
@@ -247,8 +247,8 @@ The board tab SHALL show the focused workspace's active changes in four columns:
 The panel SHALL offer "New store" on the "not set up" screen and in the Change store control. The form SHALL take a store id (letters, digits, `.`, `_`, `-`) and a folder, defaulting to `openspec-<id>` next to the focused workspace's folder. Creating SHALL run `openspec store setup <id> --path <folder>`, which also starts a git repository with a first commit. The new store SHALL then be linked to the workspace (not set up) or switched to (Change store). Folder paths containing `"`, `&`, `|`, `<`, `>`, `^`, `%` or a line break SHALL be refused before anything runs.
 
 #### Scenario: Create and link from the not-set-up screen
-- **WHEN** HIS COLIN has no OpenSpec and the user creates store `his` with the default folder
-- **THEN** `openspec store setup his --path C:\wamp64\www\projects\openspec-his` runs, and the workspace's `openspec/config.yaml` gets `store: his`
+- **WHEN** ACME HR has no OpenSpec and the user creates store `hr` with the default folder
+- **THEN** `openspec store setup hr --path C:\projects\openspec-hr` runs, and the workspace's `openspec/config.yaml` gets `store: hr`
 
 #### Scenario: Unsafe folder
 - **WHEN** the folder contains `&`
@@ -258,11 +258,11 @@ The panel SHALL offer "New store" on the "not set up" screen and in the Change s
 In a store-linked workspace, the panel SHALL offer a Change store control: switch to another registered store, or unlink. Switching SHALL rewrite only the top-level `store:` line of the workspace's OpenSpec config. Unlinking SHALL remove that line, and delete `config.yaml` if nothing else remains in it. Workspaces with a local OpenSpec root (no `store:` line) SHALL NOT offer Change store. A workspace whose `openspec/` folder has no config, no `changes/` and no `specs/` SHALL count as not set up.
 
 #### Scenario: Switch store
-- **WHEN** COLIN ECLAIMS is linked to `isotech` and the user switches to `acme`
+- **WHEN** ACME CLAIMS is linked to `teamstore` and the user switches to `acme`
 - **THEN** its config's `store:` line reads `store: acme`, other config lines are unchanged, and the panel shows acme's items with "via store acme"
 
 #### Scenario: Unlink
-- **WHEN** the user unlinks a workspace whose config holds only `store: isotech`
+- **WHEN** the user unlinks a workspace whose config holds only `store: teamstore`
 - **THEN** `config.yaml` is deleted and the panel shows the "not set up" screen with Init OpenSpec and Link store
 
 #### Scenario: Local root

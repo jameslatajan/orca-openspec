@@ -11,4 +11,4 @@
 ## 3. Docs and verify
 
 - [x] 3.1 README and CLAUDE.md
-- [ ] 3.2 `orca plugin test` and `check`; live in HIS COLIN only with the user's go-ahead (it writes a file into that project)
+- [ ] 3.2 `orca plugin test` and `check`; live in ACME HR only with the user's go-ahead (it writes a file into that project)

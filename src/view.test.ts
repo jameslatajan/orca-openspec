@@ -37,33 +37,33 @@ test('formats progress', () => {
 import { guessPrefixes, knownPrefixes, parsePrefixes, prefixOf, splitBySystem } from './view'
 
 const storeNames = [
-  'eclaims-import', 'eclaims-fallback', 'eclaims-print',
+  'claims-import', 'claims-fallback', 'claims-print',
   'ess-ldna-print', 'ess-sso', 'ess-leave',
   'access-control', 'absences-page', 'doh'
 ]
 
 test('derives prefixes and the store systems', () => {
-  assert.equal(prefixOf('eclaims-import'), 'eclaims')
+  assert.equal(prefixOf('claims-import'), 'claims')
   assert.equal(prefixOf('doh'), 'doh')
-  assert.deepEqual([...knownPrefixes(storeNames)].sort(), ['eclaims', 'ess'])
+  assert.deepEqual([...knownPrefixes(storeNames)].sort(), ['claims', 'ess'])
 })
 
 test('guesses the system from the workspace name', () => {
   const known = knownPrefixes(storeNames)
-  assert.deepEqual(guessPrefixes('COLIN ECLAIMS', known), ['eclaims'])
+  assert.deepEqual(guessPrefixes('ACME CLAIMS', known), ['claims'])
   assert.deepEqual(guessPrefixes('CRH ESS', known), ['ess'])
   assert.deepEqual(guessPrefixes('Orca Openspec', known), [])
 })
 
 test('parses an edited prefix list', () => {
-  assert.deepEqual(parsePrefixes(' Eclaims, ess ,,ess '), ['eclaims', 'ess'])
+  assert.deepEqual(parsePrefixes(' Claims, ess ,,ess '), ['claims', 'ess'])
   assert.deepEqual(parsePrefixes(''), [])
 })
 
 test('splits items into this system and shared, dropping other systems', () => {
   const known = knownPrefixes(storeNames)
-  const { mine, shared } = splitBySystem(storeNames, ['eclaims'], known, (n) => n)
-  assert.deepEqual(mine, ['eclaims-import', 'eclaims-fallback', 'eclaims-print'])
+  const { mine, shared } = splitBySystem(storeNames, ['claims'], known, (n) => n)
+  assert.deepEqual(mine, ['claims-import', 'claims-fallback', 'claims-print'])
   assert.deepEqual(shared, ['access-control', 'absences-page', 'doh'])
 })
 

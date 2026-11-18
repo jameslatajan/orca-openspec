@@ -1,6 +1,6 @@
 ## Why
 
-A shared OpenSpec store (isotech: 333 specs, changes for doh, ess, eclaims, case, …) shows every system's items in every linked workspace, so a user can't tell which belong to their system. OpenSpec records no project membership; names carry a system prefix by convention (`eclaims-…`, `ess-…`).
+A shared OpenSpec store (teamstore: 333 specs, changes for doh, ess, claims, case, …) shows every system's items in every linked workspace, so a user can't tell which belong to their system. OpenSpec records no project membership; names carry a system prefix by convention (`claims-…`, `ess-…`).
 
 ## What Changes
 

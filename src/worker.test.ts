@@ -116,18 +116,18 @@ test('links a bare workspace to a store and then reads the store', async () => {
   const bare = mkdtempSync(join(tmpdir(), 'bare-'))
   const { clearStoreCache } = await import('./store')
   clearStoreCache()
-  main.options.storeRunner = async () => JSON.stringify({ stores: [{ id: 'isotech', root: store }] })
+  main.options.storeRunner = async () => JSON.stringify({ stores: [{ id: 'teamstore', root: store }] })
   const worker = await mountWorker(main, { host: host(bare) })
-  assert.deepEqual(await worker.request('openspec.stores'), { stores: [{ id: 'isotech' }] })
-  const state = (await worker.request('openspec.linkStore', { store: 'isotech' })) as {
+  assert.deepEqual(await worker.request('openspec.stores'), { stores: [{ id: 'teamstore' }] })
+  const state = (await worker.request('openspec.linkStore', { store: 'teamstore' })) as {
     status: string
     store?: string
     changes: unknown[]
   }
   assert.equal(state.status, 'ok')
-  assert.equal(state.store, 'isotech')
+  assert.equal(state.store, 'teamstore')
   assert.equal(state.changes.length, 2)
-  assert.equal(readFileSync(join(bare, 'openspec', 'config.yaml'), 'utf8'), 'store: isotech\n')
+  assert.equal(readFileSync(join(bare, 'openspec', 'config.yaml'), 'utf8'), 'store: teamstore\n')
   await worker.deactivate()
   clearStoreCache()
 })
@@ -138,9 +138,9 @@ test('linking refuses to overwrite an existing config', async () => {
   writeFileSync(join(ws, 'openspec', 'config.yaml'), 'schema: spec-driven\n')
   const { clearStoreCache } = await import('./store')
   clearStoreCache()
-  main.options.storeRunner = async () => JSON.stringify({ stores: [{ id: 'isotech', root: fixture() }] })
+  main.options.storeRunner = async () => JSON.stringify({ stores: [{ id: 'teamstore', root: fixture() }] })
   const worker = await mountWorker(main, { host: host(ws) })
-  await assert.rejects(worker.request('openspec.linkStore', { store: 'isotech' }), /already has an OpenSpec config/)
+  await assert.rejects(worker.request('openspec.linkStore', { store: 'teamstore' }), /already has an OpenSpec config/)
   assert.equal(readFileSync(join(ws, 'openspec', 'config.yaml'), 'utf8'), 'schema: spec-driven\n')
   await worker.deactivate()
   clearStoreCache()
@@ -264,11 +264,11 @@ function storeFixture(): { workspace: string; store: string } {
   const store = fixture() // a store is an ordinary folder with openspec/
   const workspace = mkdtempSync(join(tmpdir(), 'linked-'))
   mkdirSync(join(workspace, 'openspec'), { recursive: true })
-  writeFileSync(join(workspace, 'openspec', 'config.yaml'), 'store: isotech\n')
+  writeFileSync(join(workspace, 'openspec', 'config.yaml'), 'store: teamstore\n')
   return { workspace, store }
 }
 
-const storeRunner = (store: string) => async () => JSON.stringify({ stores: [{ id: 'isotech', root: store }] })
+const storeRunner = (store: string) => async () => JSON.stringify({ stores: [{ id: 'teamstore', root: store }] })
 
 test('reads changes and specs from the store a workspace points to', async () => {
   const { workspace, store } = storeFixture()
@@ -283,7 +283,7 @@ test('reads changes and specs from the store a workspace points to', async () =>
     specs: string[]
   }
   assert.equal(state.status, 'ok')
-  assert.equal(state.store, 'isotech')
+  assert.equal(state.store, 'teamstore')
   assert.deepEqual(state.changes.map((c) => c.name), ['add-auth', 'no-tasks'])
   assert.deepEqual(state.specs, ['auth', 'billing/invoices'])
   await worker.deactivate()
@@ -297,7 +297,7 @@ test('reports an unknown store as an error with the fix', async () => {
   const worker = await mountWorker(main, { host: host(workspace) })
   const state = (await worker.request('openspec.state')) as { status: string; error?: string }
   assert.equal(state.status, 'error')
-  assert.match(state.error ?? '', /Store "isotech" is not registered/)
+  assert.match(state.error ?? '', /Store "teamstore" is not registered/)
   await worker.deactivate()
   clearStoreCache()
 })
@@ -317,7 +317,7 @@ test('watches the store folder: a store edit refreshes the panel', async () => {
   const posts = worker.posts.slice(before).filter((p) => p.event === 'openspec.changed')
   assert.equal(posts.length, 1)
   const state = posts[0].payload as { store?: string; changes: { name: string; done: number; total: number }[] }
-  assert.equal(state.store, 'isotech')
+  assert.equal(state.store, 'teamstore')
   assert.deepEqual(state.changes[0], { name: 'add-auth', done: 2, total: 2 })
   await worker.deactivate()
   main.options.watchDelayMs = 300
@@ -328,11 +328,11 @@ test('saves and returns system prefixes per workspace', async () => {
   const h = host(fixture())
   const worker = await mountWorker(main, { host: h })
   assert.deepEqual(await worker.request('openspec.systemPrefixes'), { prefixes: null })
-  assert.deepEqual(await worker.request('openspec.setSystemPrefixes', { prefixes: [' Eclaims', 'ess', 'ess', ''] }), {
-    prefixes: ['eclaims', 'ess']
+  assert.deepEqual(await worker.request('openspec.setSystemPrefixes', { prefixes: [' Claims', 'ess', 'ess', ''] }), {
+    prefixes: ['claims', 'ess']
   })
-  assert.deepEqual(await worker.request('openspec.systemPrefixes'), { prefixes: ['eclaims', 'ess'] })
-  assert.deepEqual(h.data().storage['systemPrefixes:w1'], ['eclaims', 'ess'])
+  assert.deepEqual(await worker.request('openspec.systemPrefixes'), { prefixes: ['claims', 'ess'] })
+  assert.deepEqual(h.data().storage['systemPrefixes:w1'], ['claims', 'ess'])
   await worker.deactivate()
 })
 
@@ -373,17 +373,17 @@ test('creates a store and links a bare workspace to it', async () => {
   clearStoreCache()
   const ran: string[] = []
   main.options.storeSetupRunner = async (line) => (ran.push(line), '{}')
-  main.options.storeRunner = async () => JSON.stringify({ stores: [{ id: 'his', root: storeRoot }] })
+  main.options.storeRunner = async () => JSON.stringify({ stores: [{ id: 'hr', root: storeRoot }] })
   const worker = await mountWorker(main, { host: host(bare) })
   const parent = mkdtempSync(join(tmpdir(), 'parent-'))
   const state = (await worker.request('openspec.createStore', {
-    id: 'his',
-    folder: join(parent, 'openspec-his'),
+    id: 'hr',
+    folder: join(parent, 'openspec-hr'),
     link: true
   })) as { status: string; store?: string }
   assert.equal(ran.length, 1)
-  assert.equal(state.store, 'his')
-  assert.equal(readFileSync(join(bare, 'openspec', 'config.yaml'), 'utf8'), 'store: his\n')
+  assert.equal(state.store, 'hr')
+  assert.equal(readFileSync(join(bare, 'openspec', 'config.yaml'), 'utf8'), 'store: hr\n')
   await worker.deactivate()
   clearStoreCache()
 })
@@ -391,11 +391,11 @@ test('creates a store and links a bare workspace to it', async () => {
 test('switches and unlinks a store-linked workspace', async () => {
   const ws = mkdtempSync(join(tmpdir(), 'linked-'))
   mkdirSync(join(ws, 'openspec'))
-  writeFileSync(join(ws, 'openspec', 'config.yaml'), 'store: isotech\n')
+  writeFileSync(join(ws, 'openspec', 'config.yaml'), 'store: teamstore\n')
   const { clearStoreCache } = await import('./store')
   clearStoreCache()
   main.options.storeRunner = async () =>
-    JSON.stringify({ stores: [{ id: 'isotech', root: fixture() }, { id: 'acme', root: fixture() }] })
+    JSON.stringify({ stores: [{ id: 'teamstore', root: fixture() }, { id: 'acme', root: fixture() }] })
   const worker = await mountWorker(main, { host: host(ws) })
   const switched = (await worker.request('openspec.setStore', { store: 'acme' })) as { store?: string }
   assert.equal(switched.store, 'acme')

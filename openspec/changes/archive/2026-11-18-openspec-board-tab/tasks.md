@@ -12,4 +12,4 @@
 ## 3. Docs and verify
 
 - [x] 3.1 README and CLAUDE.md
-- [x] 3.2 `orca plugin test` and `check`; the user re-approves; live: open the board in COLIN ECLAIMS and check the columns, actions and spec loading
+- [x] 3.2 `orca plugin test` and `check`; the user re-approves; live: open the board in ACME CLAIMS and check the columns, actions and spec loading

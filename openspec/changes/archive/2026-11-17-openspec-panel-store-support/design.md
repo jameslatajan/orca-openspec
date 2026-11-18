@@ -1,6 +1,6 @@
 ## Context
 
-`openspec store list --json` returns `{stores:[{id, root}]}`; on this machine that is `isotech → C:\wamp64\www\projects\openspec-store`. A linked workspace has `openspec/config.yaml` with a top-level `store: isotech` line. The worker is a trusted Node process and already uses `node:fs`. `readChanges(root)` and `readSpecs(root)` take a folder containing `openspec/`.
+`openspec store list --json` returns `{stores:[{id, root}]}`; on this machine that is `teamstore → C:\projects\openspec-store`. A linked workspace has `openspec/config.yaml` with a top-level `store: teamstore` line. The worker is a trusted Node process and already uses `node:fs`. `readChanges(root)` and `readSpecs(root)` take a folder containing `openspec/`.
 
 ## Goals / Non-Goals
 

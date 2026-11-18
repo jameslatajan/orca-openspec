@@ -36,20 +36,20 @@ export function prefixOf(name: string): string {
   return (i > 0 ? name.slice(0, i) : name).toLowerCase()
 }
 
-/** Prefixes shared by at least `min` names: the store's systems (doh, ess, eclaims, …). */
+/** Prefixes shared by at least `min` names: the store's systems (doh, ess, claims, …). */
 export function knownPrefixes(names: readonly string[], min = 3): Set<string> {
   const counts = new Map<string, number>()
   for (const n of names) counts.set(prefixOf(n), (counts.get(prefixOf(n)) ?? 0) + 1)
   return new Set([...counts].filter(([, c]) => c >= min).map(([p]) => p))
 }
 
-/** Words of a workspace name that are known prefixes ("COLIN ECLAIMS" → ["eclaims"]). */
+/** Words of a workspace name that are known prefixes ("ACME CLAIMS" → ["claims"]). */
 export function guessPrefixes(workspaceName: string, known: ReadonlySet<string>): string[] {
   const words = workspaceName.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean)
   return [...new Set(words.filter((w) => known.has(w)))]
 }
 
-/** Parses the editable "eclaims, ess" text into a clean prefix list. */
+/** Parses the editable "claims, ess" text into a clean prefix list. */
 export function parsePrefixes(text: string): string[] {
   return [...new Set(text.split(/[\s,]+/).map((p) => p.trim().toLowerCase()).filter(Boolean))]
 }

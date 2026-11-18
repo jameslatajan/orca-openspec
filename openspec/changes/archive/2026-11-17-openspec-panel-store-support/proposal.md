@@ -1,6 +1,6 @@
 ## Why
 
-Projects such as `colin_eclaims` keep their OpenSpec work in a shared store. Their `openspec/config.yaml` holds only `store: isotech`, and the changes live in `C:\wamp64\www\projects\openspec-store`. The panel reads only the workspace's own `openspec/` folder, so it shows 0 changes and 0 specs there, which is misleading.
+Projects such as `acme-claims` keep their OpenSpec work in a shared store. Their `openspec/config.yaml` holds only `store: teamstore`, and the changes live in `C:\projects\openspec-store`. The panel reads only the workspace's own `openspec/` folder, so it shows 0 changes and 0 specs there, which is misleading.
 
 ## What Changes
 

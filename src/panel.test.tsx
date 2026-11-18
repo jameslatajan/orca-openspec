@@ -2,31 +2,31 @@ import { assert, mockHost, mount, test } from 'orca/testing'
 import * as panel from './panel'
 import type { OpenSpecState } from './protocol'
 
-const bareState: OpenSpecState = { status: 'no-openspec', workspace: 'HIS COLIN', changes: [], specs: [] }
+const bareState: OpenSpecState = { status: 'no-openspec', workspace: 'ACME HR', changes: [], specs: [] }
 
 test('not set up: link the workspace to a registered store', async () => {
   const links: unknown[] = []
   const linked: OpenSpecState = {
     status: 'ok',
-    workspace: 'HIS COLIN',
-    store: 'isotech',
-    changes: [{ name: 'his-billing', done: 1, total: 2 }],
+    workspace: 'ACME HR',
+    store: 'teamstore',
+    changes: [{ name: 'hr-billing', done: 1, total: 2 }],
     specs: []
   }
   const host = mockHost({
     requests: {
       'openspec.state': bareState,
-      'openspec.stores': { stores: [{ id: 'isotech' }, { id: 'acme' }] },
+      'openspec.stores': { stores: [{ id: 'teamstore' }, { id: 'acme' }] },
       'openspec.linkStore': (input) => (links.push(input), linked)
     }
   })
   const view = await mount(panel, { host })
   assert.ok(view.find({ label: 'OpenSpec is not set up' }))
   assert.ok(view.find({ text: 'Or use a store' }))
-  await view.select({ label: 'Store' }, 'isotech')
+  await view.select({ label: 'Store' }, 'teamstore')
   await view.press({ text: 'Link store' })
-  assert.deepEqual(links, [{ store: 'isotech' }])
-  assert.ok(view.find({ text: 'via store isotech' }))
+  assert.deepEqual(links, [{ store: 'teamstore' }])
+  assert.ok(view.find({ text: 'via store teamstore' }))
   assert.equal(view.find({ label: 'OpenSpec is not set up' }), null)
   await view.unmount()
 })
@@ -46,7 +46,7 @@ test('not set up: a failed link shows the error', async () => {
   const host = mockHost({
     requests: {
       'openspec.state': bareState,
-      'openspec.stores': { stores: [{ id: 'isotech' }] },
+      'openspec.stores': { stores: [{ id: 'teamstore' }] },
       'openspec.linkStore': () => {
         throw new Error('This workspace already has an OpenSpec config; it was left unchanged.')
       }
@@ -291,9 +291,9 @@ test('Model picker shows only for claude and is sent with Explore', async () => 
 })
 
 test('shows a "via store" badge for store workspaces', async () => {
-  const { host } = setupHost({ 'openspec.state': { ...ok, store: 'isotech' } })
+  const { host } = setupHost({ 'openspec.state': { ...ok, store: 'teamstore' } })
   const view = await mount(panel, { host })
-  assert.ok(view.find({ text: 'via store isotech' }))
+  assert.ok(view.find({ text: 'via store teamstore' }))
   await view.unmount()
 })
 
@@ -335,16 +335,16 @@ test('a failed Refresh shows the error', async () => {
 
 const storeState: OpenSpecState = {
   status: 'ok',
-  workspace: 'COLIN ECLAIMS',
-  store: 'isotech',
+  workspace: 'ACME CLAIMS',
+  store: 'teamstore',
   changes: [
-    { name: 'eclaims-import', done: 1, total: 4 },
-    { name: 'eclaims-fallback', done: 2, total: 4 },
+    { name: 'claims-import', done: 1, total: 4 },
+    { name: 'claims-fallback', done: 2, total: 4 },
     { name: 'ess-ldna-print', done: 8, total: 10 },
     { name: 'ess-sso', done: 0, total: 7 },
     { name: 'access-control-fix', done: 0, total: 2 }
   ],
-  specs: ['eclaims-claims', 'ess-leave', 'ess-payslip', 'eclaims-batch', 'access-control', 'doh-report']
+  specs: ['claims-claims', 'ess-leave', 'ess-payslip', 'claims-batch', 'access-control', 'doh-report']
 }
 
 function storeHost(saved: string[] | null = null) {
@@ -364,9 +364,9 @@ test('store workspace: This system shows its items plus Shared, hides other syst
   const { host } = storeHost()
   const view = await mount(panel, { host })
   await view.select({ label: 'Scope' }, 'system')
-  assert.equal(scopeLabel(view), 'eclaims')
+  assert.equal(scopeLabel(view), 'claims')
   assert.ok(view.find({ text: /Changes \(3\)/ }))
-  assert.ok(view.find({ label: 'eclaims-import' }))
+  assert.ok(view.find({ label: 'claims-import' }))
   assert.ok(view.find({ label: 'access-control-fix' })) // shared
   assert.ok(view.find({ text: 'Shared' }))
   assert.equal(view.find({ label: 'ess-ldna-print' }), null)
@@ -384,10 +384,10 @@ test('store workspace: editing the system saves it and widens the list', async (
   const view = await mount(panel, { host })
   await view.select({ label: 'Scope' }, 'system')
   await view.press({ label: 'Store settings' })
-  await view.type({ label: 'System prefixes' }, 'eclaims, ess', { replace: true })
+  await view.type({ label: 'System prefixes' }, 'claims, ess', { replace: true })
   await view.press({ text: 'Save' })
-  assert.deepEqual(saves, [['eclaims', 'ess']])
-  assert.equal(scopeLabel(view), 'eclaims, ess')
+  assert.deepEqual(saves, [['claims', 'ess']])
+  assert.equal(scopeLabel(view), 'claims, ess')
   assert.ok(view.find({ label: 'ess-ldna-print' }))
   assert.ok(view.find({ text: /Changes \(5\)/ }))
   await view.unmount()
@@ -399,7 +399,7 @@ test('store workspace: a saved system wins over the guess', async () => {
   await view.select({ label: 'Scope' }, 'system')
   assert.equal(scopeLabel(view), 'ess')
   assert.ok(view.find({ label: 'ess-sso' }))
-  assert.equal(view.find({ label: 'eclaims-import' }), null)
+  assert.equal(view.find({ label: 'claims-import' }), null)
   await view.unmount()
 })
 
@@ -408,7 +408,7 @@ test('store workspace: the Specs table marks this system and shared specs', asyn
   const view = await mount(panel, { host })
   await view.select({ label: 'Scope' }, 'system')
   await view.select({ label: 'OpenSpec views' }, 'specs')
-  assert.deepEqual(view.rowsOf({ label: 'Specs' }), ['eclaims-claims', 'eclaims-batch', 'access-control', 'doh-report'])
+  assert.deepEqual(view.rowsOf({ label: 'Specs' }), ['claims-claims', 'claims-batch', 'access-control', 'doh-report'])
   assert.deepEqual(view.columnsOf({ label: 'Specs' }), ['name', 'group'])
   await view.select({ label: 'Scope' }, 'all')
   assert.deepEqual(view.columnsOf({ label: 'Specs' }), ['name'])
@@ -436,22 +436,22 @@ test('the header board button opens the board', async () => {
 
 test('not set up: create a new store and link the workspace to it', async () => {
   const creates: unknown[] = []
-  const linkedState: OpenSpecState = { status: 'ok', workspace: 'HIS COLIN', store: 'his', changes: [], specs: [] }
+  const linkedState: OpenSpecState = { status: 'ok', workspace: 'ACME HR', store: 'hr', changes: [], specs: [] }
   const host = mockHost({
     requests: {
       'openspec.state': bareState,
-      'openspec.stores': { stores: [{ id: 'isotech' }] },
-      'openspec.storeDefaults': { parent: 'C:\\wamp64\\www\\projects' },
+      'openspec.stores': { stores: [{ id: 'teamstore' }] },
+      'openspec.storeDefaults': { parent: 'C:\\projects' },
       'openspec.createStore': (input) => (creates.push(input), linkedState)
     }
   })
   const view = await mount(panel, { host })
   await view.press({ text: 'New store' })
-  await view.type({ label: 'Store id' }, 'his')
-  assert.equal(view.find({ label: 'Folder' })?.props.value, 'C:\\wamp64\\www\\projects\\openspec-his')
+  await view.type({ label: 'Store id' }, 'hr')
+  assert.equal(view.find({ label: 'Folder' })?.props.value, 'C:\\projects\\openspec-hr')
   await view.press({ text: 'Create store' })
-  assert.deepEqual(creates, [{ id: 'his', folder: 'C:\\wamp64\\www\\projects\\openspec-his', link: true }])
-  assert.ok(view.find({ text: 'via store his' }))
+  assert.deepEqual(creates, [{ id: 'hr', folder: 'C:\\projects\\openspec-hr', link: true }])
+  assert.ok(view.find({ text: 'via store hr' }))
   await view.unmount()
 })
 
@@ -462,10 +462,10 @@ test('store workspace: change store lets you switch or unlink', async () => {
     requests: {
       'openspec.state': () => current,
       'openspec.systemPrefixes': { prefixes: null },
-      'openspec.stores': { stores: [{ id: 'isotech' }, { id: 'acme' }] },
+      'openspec.stores': { stores: [{ id: 'teamstore' }, { id: 'acme' }] },
       'openspec.setStore': ({ store }) => {
         sets.push(store)
-        current = store ? { ...storeState, store } : { status: 'no-openspec', workspace: 'COLIN ECLAIMS', changes: [], specs: [] }
+        current = store ? { ...storeState, store } : { status: 'no-openspec', workspace: 'ACME CLAIMS', changes: [], specs: [] }
         return current
       }
     }

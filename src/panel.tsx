@@ -162,7 +162,7 @@ function NewStoreForm() {
       <Text>New store</Text>
       <Input
         label="Store id"
-        placeholder="e.g. his"
+        placeholder="e.g. hr"
         value={read(newStoreId)}
         disabled={busy}
         onChange={(v) => {
@@ -204,7 +204,7 @@ function ChangeStoreBox(props: { current: string; prefixes: string[] }) {
       <Stack gap="sm" align="stretch">
         <Input
           label="System prefixes"
-          placeholder="e.g. eclaims, ess"
+          placeholder="e.g. claims, ess"
           value={read(editingSystem) ? read(systemDraft) : props.prefixes.join(', ')}
           disabled={busy}
           onChange={(v) => {

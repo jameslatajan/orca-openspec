@@ -7,4 +7,4 @@
 ## 2. Docs and verify
 
 - [x] 2.1 README and CLAUDE.md
-- [x] 2.2 `orca plugin test` and `check`; live in COLIN ECLAIMS: Specs (125) scrolls in batches
+- [x] 2.2 `orca plugin test` and `check`; live in ACME CLAIMS: Specs (125) scrolls in batches

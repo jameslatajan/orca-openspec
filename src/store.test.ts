@@ -5,12 +5,12 @@ import { assert, test } from 'orca/testing'
 import { clearStoreCache, listStores, resolveStore, StoreError, storeIdFrom, writeStoreLink } from './store'
 
 const twoStores = async () =>
-  JSON.stringify({ stores: [{ id: 'isotech', root: 'C:\\stores\\isotech' }, { id: 'acme', root: '/s/acme' }] })
+  JSON.stringify({ stores: [{ id: 'teamstore', root: 'C:\\stores\\teamstore' }, { id: 'acme', root: '/s/acme' }] })
 
 test('lists registered stores', async () => {
   clearStoreCache()
   assert.deepEqual(await listStores(twoStores), [
-    { id: 'isotech', root: 'C:\\stores\\isotech' },
+    { id: 'teamstore', root: 'C:\\stores\\teamstore' },
     { id: 'acme', root: '/s/acme' }
   ])
   clearStoreCache()
@@ -19,9 +19,9 @@ test('lists registered stores', async () => {
 test('links a workspace by creating openspec/config.yaml', async () => {
   clearStoreCache()
   const ws = mkdtempSync(join(tmpdir(), 'link-'))
-  const file = await writeStoreLink(ws, 'isotech', twoStores)
-  assert.equal(readFileSync(file, 'utf8'), 'store: isotech\n')
-  assert.equal(storeIdFrom(readFileSync(join(ws, 'openspec', 'config.yaml'), 'utf8')), 'isotech')
+  const file = await writeStoreLink(ws, 'teamstore', twoStores)
+  assert.equal(readFileSync(file, 'utf8'), 'store: teamstore\n')
+  assert.equal(storeIdFrom(readFileSync(join(ws, 'openspec', 'config.yaml'), 'utf8')), 'teamstore')
   clearStoreCache()
 })
 
@@ -30,7 +30,7 @@ test('never overwrites a config and refuses unknown or unsafe ids', async () => 
   const ws = mkdtempSync(join(tmpdir(), 'link-'))
   mkdirSync(join(ws, 'openspec'))
   writeFileSync(join(ws, 'openspec', 'config.yml'), 'schema: spec-driven\n')
-  await assert.rejects(writeStoreLink(ws, 'isotech', twoStores), /already has an OpenSpec config/)
+  await assert.rejects(writeStoreLink(ws, 'teamstore', twoStores), /already has an OpenSpec config/)
   assert.equal(existsSync(join(ws, 'openspec', 'config.yaml')), false)
 
   const fresh = mkdtempSync(join(tmpdir(), 'link-'))
@@ -41,26 +41,26 @@ test('never overwrites a config and refuses unknown or unsafe ids', async () => 
 })
 
 test('reads a top-level store line, ignoring quotes and comments', () => {
-  assert.equal(storeIdFrom('store: isotech\n'), 'isotech')
-  assert.equal(storeIdFrom('schema: spec-driven\nstore: "isotech"  # shared\n'), 'isotech')
-  assert.equal(storeIdFrom("store: 'isotech'\r\n"), 'isotech')
+  assert.equal(storeIdFrom('store: teamstore\n'), 'teamstore')
+  assert.equal(storeIdFrom('schema: spec-driven\nstore: "teamstore"  # shared\n'), 'teamstore')
+  assert.equal(storeIdFrom("store: 'teamstore'\r\n"), 'teamstore')
   assert.equal(storeIdFrom('schema: spec-driven\n'), null)
-  assert.equal(storeIdFrom('# store: isotech\n'), null)
+  assert.equal(storeIdFrom('# store: teamstore\n'), null)
   assert.equal(storeIdFrom('rules:\n  store: nested\n'), null)
   assert.equal(storeIdFrom('store:\n'), null)
 })
 
-const listing = JSON.stringify({ stores: [{ id: 'isotech', root: 'C:\stores\isotech' }], status: [] })
+const listing = JSON.stringify({ stores: [{ id: 'teamstore', root: 'C:\stores\teamstore' }], status: [] })
 
 test('resolves a registered store and caches the listing', async () => {
   clearStoreCache()
   let calls = 0
   const run = async () => (calls++, listing)
-  assert.equal(await resolveStore('isotech', run), 'C:\stores\isotech')
-  assert.equal(await resolveStore('isotech', run), 'C:\stores\isotech')
+  assert.equal(await resolveStore('teamstore', run), 'C:\stores\teamstore')
+  assert.equal(await resolveStore('teamstore', run), 'C:\stores\teamstore')
   assert.equal(calls, 1)
   clearStoreCache()
-  await resolveStore('isotech', run)
+  await resolveStore('teamstore', run)
   assert.equal(calls, 2)
 })
 
@@ -73,10 +73,10 @@ test('names the fix for an unknown store or a missing CLI', async () => {
   })
   clearStoreCache()
   await assert.rejects(
-    resolveStore('isotech', async () => {
+    resolveStore('teamstore', async () => {
       throw new Error('spawn openspec ENOENT')
     }),
-    /openspec CLI is needed to resolve store "isotech"/
+    /openspec CLI is needed to resolve store "teamstore"/
   )
   clearStoreCache()
 })
@@ -88,9 +88,9 @@ test('creates a store with openspec store setup, refusing unsafe input first', a
   const parent = mkdtempSync(join(tmpdir(), 'stores-'))
   const ran: string[] = []
   const run = async (line: string) => (ran.push(line), '{}')
-  const folder = join(parent, 'openspec-his')
-  assert.deepEqual(await createStore('his', folder, run), { id: 'his', root: folder })
-  assert.deepEqual(ran, [`openspec store setup "his" --path "${folder}" --json`])
+  const folder = join(parent, 'openspec-hr')
+  assert.deepEqual(await createStore('hr', folder, run), { id: 'hr', root: folder })
+  assert.deepEqual(ran, [`openspec store setup "hr" --path "${folder}" --json`])
 
   await assert.rejects(createStore('bad id', folder, run), /letters, digits/)
   await assert.rejects(createStore('ok', join(parent, 'a&b'), run), /not allowed/)
@@ -114,7 +114,7 @@ function linked(config: string): string {
 
 test('switches only the store line and keeps the rest of the config', async () => {
   clearStoreCache()
-  const ws = linked('schema: spec-driven\r\nstore: isotech\r\n# note\r\n')
+  const ws = linked('schema: spec-driven\r\nstore: teamstore\r\n# note\r\n')
   await setStoreLine(ws, 'acme', twoStores)
   assert.equal(readFileSync(join(ws, 'openspec', 'config.yaml'), 'utf8'), 'schema: spec-driven\r\nstore: acme\r\n# note\r\n')
   await assert.rejects(setStoreLine(ws, 'missing', twoStores), /not registered/)
@@ -123,13 +123,13 @@ test('switches only the store line and keeps the rest of the config', async () =
 
 test('unlinks: removes the store line, deleting a config that held nothing else', async () => {
   clearStoreCache()
-  const only = linked('store: isotech\n')
+  const only = linked('store: teamstore\n')
   await setStoreLine(only, null, twoStores)
   assert.equal(existsSync(join(only, 'openspec', 'config.yaml')), false)
   writeFileSync(join(only, 'openspec', 'board.openspec'), '#')
   assert.equal(hasOpenSpec(only), false) // board file alone is not "set up"
 
-  const more = linked('schema: spec-driven\nstore: isotech\n')
+  const more = linked('schema: spec-driven\nstore: teamstore\n')
   await setStoreLine(more, null, twoStores)
   assert.equal(readFileSync(join(more, 'openspec', 'config.yaml'), 'utf8'), 'schema: spec-driven\n')
   clearStoreCache()

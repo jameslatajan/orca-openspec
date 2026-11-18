@@ -12,4 +12,4 @@
 ## 3. Docs and verify
 
 - [x] 3.1 README and CLAUDE.md
-- [x] 3.2 `orca plugin test` and `check`; live in COLIN ECLAIMS: This system shows eclaims items plus Shared
+- [x] 3.2 `orca plugin test` and `check`; live in ACME CLAIMS: This system shows claims items plus Shared

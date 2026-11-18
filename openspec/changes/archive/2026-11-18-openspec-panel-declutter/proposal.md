@@ -5,7 +5,7 @@ In store workspaces the sidebar panel stacks six rows of controls before the fir
 ## What Changes
 
 - **Status:** the three chips become a Status dropdown on the same row as the filter box.
-- **Scope:** This system / All, the system text and the pencil become one scope dropdown ("eclaims" / "All systems"). Editing the system moves into the store settings box under the badge pencil.
+- **Scope:** This system / All, the system text and the pencil become one scope dropdown ("claims" / "All systems"). Editing the system moves into the store settings box under the badge pencil.
 - **Updated:** the "Updated …" line is removed. The time shows as the refresh button's tooltip, and the refresh spinner stays.
 - **Result:** four rows of controls instead of six.
 - No behaviour, worker or permission changes. The board tab is unchanged.

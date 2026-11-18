@@ -13,4 +13,4 @@
 ## 3. Docs and verify
 
 - [x] 3.1 README (store support) and CLAUDE.md
-- [x] 3.2 `orca plugin test` and `check`; live in colin_eclaims: the panel lists the isotech store's changes with the badge
+- [x] 3.2 `orca plugin test` and `check`; live in acme-claims: the panel lists the teamstore store's changes with the badge
