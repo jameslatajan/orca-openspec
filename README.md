@@ -4,7 +4,7 @@ An [Orca](https://github.com/stablyai/orca) plugin for [OpenSpec](https://github
 
 ## Features
 
-- **Changes tab:** every active change in `openspec/changes/` as a compact row with a status (Planning, Not started, In progress, Ready to archive), a progress bar and the checked/total task count from its `tasks.md`. You can filter by name, or use the All / In progress / Done chips.
+- **Changes tab:** every active change in `openspec/changes/` as a compact row with a status (Planning, Not started, In progress, Ready to archive), a progress bar and the checked/total task count from its `tasks.md`. Filter by name, and narrow by status (All / In progress / Done) with the dropdown next to the filter box.
 - **Specs tab:** every capability under `openspec/specs/`, including nested ones such as `billing/invoices`, with a name filter. Specs show in a table that loads 40 at a time as you scroll, so stores with hundreds of specs stay quick. The filter still searches all of them.
 - **Actions:**
   - **+** (New change) in the header opens a form. Describe the change, pick an agent (claude, codex, gemini, opencode, cursor or copilot), then press **Explore** (`/openspec-explore <description>`) or **Propose** (`/openspec-propose <description>`). With **claude**, you can also pick a **Model** (Default, Opus, Sonnet or Haiku): the plugin types `/model <name>` before the command.
@@ -20,9 +20,9 @@ An [Orca](https://github.com/stablyai/orca) plugin for [OpenSpec](https://github
   - A searchable specs list sits at the side.
   - It's backed by `openspec/board.openspec`, which is created on first open and added to `openspec/.gitignore`.
 - **New store:** **New store** (on the "not set up" screen, or under Change store) runs `openspec store setup <id> --path <folder>`, which makes a new git repo with a first commit, then links the workspace to it. The folder defaults to `openspec-<id>` next to your project.
-- **Change store:** in a store workspace, the pencil next to "via store …" lets you **Switch** to another registered store or **Unlink**. Both edit only the `store:` line. Unlinking deletes `config.yaml` if that was all it held, and the panel then offers Init / Link store again. Workspaces with their own local OpenSpec can't switch.
+- **Change store:** in a store workspace, the pencil next to "via store …" opens **Store settings**: edit the system prefixes, **Switch** to another registered store, **Unlink**, or create a **New store**. Both edit only the `store:` line. Unlinking deletes `config.yaml` if that was all it held, and the panel then offers Init / Link store again. Workspaces with their own local OpenSpec can't switch.
 - **Link to a store:** in a workspace without OpenSpec, the "not set up" screen also offers **Or use a store**: pick a registered store and press **Link store**. That creates `openspec/config.yaml` with just `store: <id>`, never overwriting an existing config. With no stores registered, the screen shows the `openspec store register <path>` command instead.
-- **This system / All:** a shared store can hold many systems' items. In a store workspace, **This system** shows only the items whose name starts with your system's prefix (`eclaims-…`), then a **Shared** section for items with no common system prefix. The prefixes are guessed from the workspace name ("COLIN ECLAIMS" → `eclaims`); use **Edit system** to change them, for example `eclaims, ess`. **All** shows everything.
+- **Scope (store workspaces):** a shared store can hold many systems' items. In a store workspace, the scope dropdown next to the store badge shows by default only the items whose name starts with your system's prefix (`eclaims-…`), then a **Shared** section for items with no common system prefix. The prefixes are guessed from the workspace name ("COLIN ECLAIMS" → `eclaims`); change them in Store settings, for example `eclaims, ess`. **All systems** shows everything.
 - **Init OpenSpec:** in a workspace without an `openspec/` folder, a button opens a terminal running `openspec init`.
 
 ## Requirements

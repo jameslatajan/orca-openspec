@@ -13,7 +13,6 @@ import {
   ListItem,
   plugin,
   Progress,
-  RelativeTime,
   read,
   Row,
   Select,
@@ -25,7 +24,6 @@ import {
   Tabs,
   Text,
   Textarea,
-  Toolbar,
   update,
   type PanelContext
 } from 'orca'
@@ -194,14 +192,29 @@ function NewStoreForm() {
   )
 }
 
-function ChangeStoreBox(props: { current: string }) {
+function ChangeStoreBox(props: { current: string; prefixes: string[] }) {
   const stores = (read(storeOptions) ?? []).filter((id) => id !== props.current)
   const pick = read(storePick)
   const target = pick && stores.includes(pick) ? pick : stores[0]
   const busy = read(storeBusy)
   return (
     <Box direction="column" gap="sm" padding="sm">
-      <Text>Change store</Text>
+      <Text>Store settings</Text>
+      <Row gap="xs">
+        <Input
+          label="System prefixes"
+          placeholder="e.g. eclaims, ess"
+          value={read(editingSystem) ? read(systemDraft) : props.prefixes.join(', ')}
+          disabled={busy}
+          onChange={(v) => {
+            set(systemDraft, v)
+            set(editingSystem, true)
+          }}
+        />
+        <Button size="sm" variant="solid" disabled={busy || !read(editingSystem)} onPress={saveSystem}>
+          Save
+        </Button>
+      </Row>
       {stores.length ? (
         <Row gap="xs">
           <Select
@@ -293,68 +306,22 @@ function systemView(s: OpenSpecState) {
   }
 }
 
-function SystemBar(props: { prefixes: string[] }) {
-  const mode = read(systemMode)
-  const editing = read(editingSystem)
-  const modes: { value: 'system' | 'all'; label: string }[] = [
-    { value: 'system', label: 'This system' },
-    { value: 'all', label: 'All' }
-  ]
+/** One dropdown for the store scope: this system (named by its prefixes) or all systems. */
+function ScopeSelect(props: { prefixes: string[] }) {
   return (
-    <Stack gap="xs">
-      <Row gap="xs">
-        <Toolbar label="Store scope" gap="xs">
-          {modes.map((m) => (
-            <Button
-              key={m.value}
-              size="xs"
-              variant={m.value === mode ? 'solid' : 'outline'}
-              tone={m.value === mode ? 'accent' : 'neutral'}
-              onPress={() => {
-                set(systemMode, m.value)
-                set(specLimit, BATCH)
-              }}
-            >
-              {m.label}
-            </Button>
-          ))}
-        </Toolbar>
-        {mode === 'system' && !editing ? (
-          <Row gap="none">
-            <Text muted size="xs">
-              {props.prefixes.length ? props.prefixes.join(', ') : 'system not set'}
-            </Text>
-            <IconButton
-              icon="edit"
-              label="Edit system"
-              size="xs"
-              variant="ghost"
-              onPress={() => {
-                set(systemDraft, props.prefixes.join(', '))
-                set(editingSystem, true)
-              }}
-            />
-          </Row>
-        ) : null}
-      </Row>
-      {editing ? (
-        <Row gap="xs">
-          <Input
-            label="System prefixes"
-            labelHidden
-            placeholder="e.g. eclaims, ess"
-            value={read(systemDraft)}
-            onChange={(v) => set(systemDraft, v)}
-          />
-          <Button size="xs" variant="solid" onPress={saveSystem}>
-            Save
-          </Button>
-          <Button size="xs" variant="ghost" onPress={() => set(editingSystem, false)}>
-            Cancel
-          </Button>
-        </Row>
-      ) : null}
-    </Stack>
+    <Select
+      label="Scope"
+      labelHidden
+      value={read(systemMode)}
+      options={[
+        { value: 'system', label: props.prefixes.length ? props.prefixes.join(', ') : 'No system set' },
+        { value: 'all', label: 'All systems' }
+      ]}
+      onChange={(v) => {
+        set(systemMode, v === 'all' ? 'all' : 'system')
+        set(specLimit, BATCH)
+      }}
+    />
   )
 }
 
@@ -564,35 +531,36 @@ function LinkStore() {
   )
 }
 
-function UpdatedLine() {
-  const at = read(updatedAt)
-  return at === null ? null : (
-    <Text muted size="xs">
-      Updated <RelativeTime at={at} muted />
-    </Text>
+
+/** "via store <id>" plus the store settings pencil. */
+function StoreBadge(props: { store: string }) {
+  return (
+    <Row gap="none">
+      <Badge tone="accent">via store {props.store}</Badge>
+      <IconButton
+        icon={read(changeStoreOpen) ? 'close' : 'edit'}
+        label={read(changeStoreOpen) ? 'Close store settings' : 'Store settings'}
+        size="xs"
+        variant="ghost"
+        onPress={() => {
+          const opening = !read(changeStoreOpen)
+          set(changeStoreOpen, opening)
+          set(newStoreOpen, false)
+          if (opening) void loadStores()
+        }}
+      />
+    </Row>
   )
 }
 
-function Header(props: { title: string; canCreate: boolean; store?: string }) {
+/** `store` shows the badge in the header; the main view passes `badgeBelow` to put it on the
+ *  scope row instead, so the header fits the sidebar width. */
+function Header(props: { title: string; canCreate: boolean; store?: string; badgeBelow?: boolean }) {
   return (
     <Row justify="between">
       <Row gap="xs">
         <Heading level={3}>{props.title}</Heading>
-        {props.store ? <Badge tone="accent">via store {props.store}</Badge> : null}
-        {props.store ? (
-          <IconButton
-            icon={read(changeStoreOpen) ? 'close' : 'edit'}
-            label={read(changeStoreOpen) ? 'Close change store' : 'Change store'}
-            size="xs"
-            variant="ghost"
-            onPress={() => {
-              const opening = !read(changeStoreOpen)
-              set(changeStoreOpen, opening)
-              set(newStoreOpen, false)
-              if (opening) void loadStores()
-            }}
-          />
-        ) : null}
+        {props.store && !props.badgeBelow ? <StoreBadge store={props.store} /> : null}
       </Row>
       <Row gap="xs">
         {props.canCreate ? (
@@ -617,7 +585,14 @@ function Header(props: { title: string; canCreate: boolean; store?: string }) {
         {read(refreshing) ? (
           <Spinner label="Refreshing" labelHidden />
         ) : (
-          <IconButton icon="refresh" label="Refresh" size="sm" variant="ghost" onPress={reload} />
+          <IconButton
+            icon="refresh"
+            label="Refresh"
+            tooltip={read(updatedAt) ? `Updated ${new Date(read(updatedAt) as number).toLocaleTimeString()}` : 'Refresh'}
+            size="sm"
+            variant="ghost"
+            onPress={reload}
+          />
         )}
       </Row>
     </Row>
@@ -649,27 +624,23 @@ function ChangesTab(props: { changes: ChangeInfo[]; shared?: ChangeInfo[] }) {
   const current = visible.find((c) => c.name === read(selected))
   return (
     <Stack gap="sm">
-      <Input
-        label="Filter changes"
-        labelHidden
-        type="search"
-        placeholder="Filter changes"
-        value={text}
-        onChange={(v) => set(changeFilter, v)}
-      />
-      <Toolbar label="Show" gap="xs">
-        {CHIPS.map((c) => (
-          <Button
-            key={c.value}
-            size="xs"
-            variant={c.value === active ? 'solid' : 'outline'}
-            tone={c.value === active ? 'accent' : 'neutral'}
-            onPress={() => set(chip, c.value)}
-          >
-            {c.label}
-          </Button>
-        ))}
-      </Toolbar>
+      <Row gap="xs">
+        <Input
+          label="Filter changes"
+          labelHidden
+          type="search"
+          placeholder="Filter changes"
+          value={text}
+          onChange={(v) => set(changeFilter, v)}
+        />
+        <Select
+          label="Status"
+          labelHidden
+          value={active}
+          options={CHIPS}
+          onChange={(v) => set(chip, v as Chip)}
+        />
+      </Row>
       {total === 0 ? (
         <Text muted>No active changes.</Text>
       ) : visible.length === 0 ? (
@@ -803,12 +774,16 @@ export default function Panel() {
   const specCount = filtered ? filtered.specs.mine.length + filtered.specs.shared.length : s.specs.length
   return (
     <Stack gap="sm">
-      <Header title={title} canCreate store={s.store} />
-      <UpdatedLine />
-      {s.store && read(changeStoreOpen) ? (
-        read(newStoreOpen) ? <NewStoreForm /> : <ChangeStoreBox current={s.store} />
+      <Header title={title} canCreate store={s.store} badgeBelow />
+      {s.store && view ? (
+        <Row gap="xs">
+          <StoreBadge store={s.store} />
+          <ScopeSelect prefixes={view.prefixes} />
+        </Row>
       ) : null}
-      {view ? <SystemBar prefixes={view.prefixes} /> : null}
+      {s.store && read(changeStoreOpen) ? (
+        read(newStoreOpen) ? <NewStoreForm /> : <ChangeStoreBox current={s.store} prefixes={view?.prefixes ?? []} />
+      ) : null}
       {read(formOpen) ? <NewChangeForm /> : null}
       {errorBox}
       <Tabs label="OpenSpec views" value={read(tab)} onChange={(v) => set(tab, v)}>

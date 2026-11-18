@@ -57,7 +57,7 @@ The authoritative plugin API reference ships with the CLI. Read it instead of gu
 - **System filter (store workspaces):** OpenSpec records no project membership, so the panel filters by name prefix.
   - `view.ts`: `prefixOf`, `knownPrefixes` (a prefix shared by ≥3 items), `guessPrefixes` (from the workspace name) and `splitBySystem` (into `mine` and `shared`; other systems are dropped).
   - The worker stores each workspace's list under `systemPrefixes:<workspaceId>`.
-  - `systemMode` (`persist: 'plugin'`) switches between This system and All.
+  - `systemMode` (`persist: 'plugin'`) is the scope dropdown (this system / All systems); editing the prefixes lives in the Store settings box (`ChangeStoreBox`).
 - **Selected change** is a `persist: 'storage'` atom (`selectedChange`), so the worker's palette commands read the same value from `orca.storage`.
 - **Worker state:** a worker save restarts it and drops in-memory state. Anything that must survive goes in `orca.storage`.
 
