@@ -2,7 +2,7 @@
   "manifestVersion": 2,
   "id": "openspec",
   "name": "OpenSpec",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "OpenSpec in Orca: see a workspace's changes and specs (local or in a shared store), open a Kanban board, and start agents to explore, propose, apply, verify and archive changes.",
   "icon": "assets/icon.png",
   "cover": {
@@ -19,6 +19,11 @@
       "path": "assets/screenshot-panel.png",
       "alt": "The OpenSpec sidebar panel with five changes, their status and progress bars",
       "caption": "Everything at a glance in the sidebar"
+    },
+    {
+      "path": "assets/screenshot-stores.png",
+      "alt": "The panel linked to a shared store, filtered to the shop system with a Shared section, and the Store settings card",
+      "caption": "Shared stores, filtered to your system"
     }
   ],
   "engines": {
