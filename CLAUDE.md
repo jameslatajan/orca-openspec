@@ -63,7 +63,7 @@ The authoritative plugin API reference ships with the CLI. Read it instead of gu
 
 ## Gotchas
 
-- `engines.orca` must be ≥ the newest `Since` of anything used. It is `>=1.4.248` because a capability requires it, and `plugin check` fails if it is lower.
+- `engines.orca` must be ≥ the newest `Since` of anything used. It is `>=1.4.259` because `terminal.focus` (used to show launched agents) requires it, and `plugin check` fails if it is lower.
 - Adding a capability, command or event changes the approval fingerprint. The user must re-approve the plugin (`orca plugin dev load . --approve <fingerprint>`), so never approve on their behalf. Code-only edits reload without approval.
 - Every worker request acts on Orca's *focused* workspace, and focus can move between CLI calls. Never drive write requests (`setStore`, `linkStore`, `createStore`, `openBoard`) with `orca plugin dev request` against real projects: one such unlink hit the wrong project. Test writes with unit tests on temp folders, or have the user click in the panel of the workspace they're looking at.
 - After changing `orca-plugin.json` (commands, editors, events), run `orca plugin dev reload .`. `dev load` can report `ok` while Orca keeps the old manifest. A command the worker registers but the old manifest lacks makes Orca drop events, shown in `orca plugin logs` as "registered undeclared command".

@@ -27,15 +27,15 @@ An [Orca](https://github.com/stablyai/orca) plugin for [OpenSpec](https://github
 
 ## Requirements
 
-- Orca 1.4.248 or newer
+- Orca 1.4.259 or newer
 - The [`openspec` CLI](https://github.com/Fission-AI/OpenSpec), **2.1.0** (the version this plugin is built and tested with). It's used for Init OpenSpec and for stores: reading the store list, creating stores (`openspec store setup`), and resolving a workspace's `store:` line. Check yours with `openspec --version`.
 - An agent with the OpenSpec skills or slash commands installed (default: `claude`)
 
 | | Version |
 | --- | --- |
-| This plugin | 1.0.0 |
+| This plugin | 1.0.1 |
 | OpenSpec CLI (tested) | 2.1.0 |
-| Orca (minimum) | 1.4.248 |
+| Orca (minimum) | 1.4.259 |
 
 ## Install
 
