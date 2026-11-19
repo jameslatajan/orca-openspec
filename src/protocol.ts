@@ -21,7 +21,9 @@ declare module 'orca' {
     /** Opens a terminal running `openspec init` in the focused workspace. */
     'openspec.init': { output: { terminalId: string } }
     /** Creates openspec/board.openspec if needed and opens the board in a main editor tab. */
-    'openspec.openBoard': { output: { opened: boolean; message: string } }
+    'openspec.openBoard': { input?: { change?: string }; output: { opened: boolean; message: string } }
+    /** The change the board should open (from a double-click in the panel), cleared once read. */
+    'openspec.takeFocus': { output: { change: string | null } }
     /** The OpenSpec stores registered on this machine. */
     'openspec.stores': { output: { stores: { id: string }[] } }
     /** Links the focused workspace to a store (creates openspec/config.yaml) and answers fresh state. */
@@ -56,6 +58,8 @@ declare module 'orca' {
     'openspec.changed': OpenSpecState
     /** Asks open panels to show the New change form (from the palette command). */
     'openspec.showForm': Record<string, never>
+    /** Asks an open board to show this change's page (double-click in the panel). */
+    'openspec.focusChange': { change: string }
   }
 }
 

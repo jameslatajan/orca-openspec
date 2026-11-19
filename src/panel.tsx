@@ -610,6 +610,18 @@ function Header(props: { title: string; canCreate: boolean; store?: string; badg
   )
 }
 
+/** Last row press, to turn a second press on the same row into a double-click. */
+let lastPress: { name: string; at: number } | null = null
+const DOUBLE_PRESS_MS = 400
+
+function pressChange(name: string): void {
+  const now = Date.now()
+  const double = lastPress?.name === name && now - lastPress.at < DOUBLE_PRESS_MS
+  lastPress = double ? null : { name, at: now }
+  set(selected, name)
+  if (double) void call(() => plugin.request('openspec.openBoard', { change: name }))
+}
+
 function changeRows(items: ChangeInfo[], currentName: string | undefined) {
   return items.map((c) => (
     <ListItem
@@ -617,7 +629,7 @@ function changeRows(items: ChangeInfo[], currentName: string | undefined) {
       title={c.name}
       description={`${statusOf(c)} · ${progressText(c)}`}
       current={c.name === currentName}
-      onPress={() => set(selected, c.name)}
+      onPress={() => pressChange(c.name)}
     >
       {c.total ? <Progress label={`${c.name} progress`} labelHidden value={Math.round((100 * c.done) / c.total)} /> : null}
     </ListItem>

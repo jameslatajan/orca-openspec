@@ -848,6 +848,11 @@ document.addEventListener('keydown', (e) => {
 })
 
 orca.plugin.on('openspec.changed', (payload) => receive(payload as OpenSpecState))
+orca.plugin.on('openspec.focusChange', (payload) => {
+  const { change } = payload as { change: string }
+  void call(() => orca.plugin.request('openspec.takeFocus')) // consumed here, so a later board load won't jump
+  void openChange(change, false)
+})
 
 // The board file is only an anchor for this tab; start the document session so Orca knows the
 // editor is ready, and never edit it.
@@ -857,3 +862,5 @@ const storedMode = await orca.storage.get('boardSystemMode').catch(() => undefin
 if (storedMode === 'all' || storedMode === 'system') mode = storedMode
 const first = await call(() => orca.plugin.request('openspec.state'))
 if (first) receive(first)
+const focus = await call(() => orca.plugin.request('openspec.takeFocus'))
+if (focus?.change) void openChange(focus.change, false)

@@ -347,7 +347,7 @@ export default function activate(orca: OrcaWorkerApi): void {
   })
 
   /** Opens the board tab; returns a message for the palette or the panel. */
-  const openBoard = async (): Promise<{ opened: boolean; message: string }> => {
+  const openBoard = async (change?: string): Promise<{ opened: boolean; message: string }> => {
     const ws = await focused(orca)
     if (!ws) return { opened: false, message: 'Focus a workspace first.' }
     if (ws.hostId && ws.hostId !== 'local') return { opened: false, message: 'Remote workspaces are not supported yet.' }
@@ -362,9 +362,20 @@ export default function activate(orca: OrcaWorkerApi): void {
     } catch {
       await orca.host.call('editor.open', { workspaceId: ws.workspaceId, path: file }) // some hosts want an absolute path
     }
+    if (change) {
+      // A board that is already open hears the event; one that is just loading takes it on start.
+      pendingFocus = { change, at: Date.now() }
+      orca.panels.post('openspec.focusChange', { change })
+    }
     return { opened: true, message: 'Opened the OpenSpec board' }
   }
-  orca.panels.handle('openspec.openBoard', () => openBoard())
+  let pendingFocus: { change: string; at: number } | null = null
+  orca.panels.handle('openspec.openBoard', (input) => openBoard(input?.change))
+  orca.panels.handle('openspec.takeFocus', () => {
+    const fresh = pendingFocus && Date.now() - pendingFocus.at < 10_000 ? pendingFocus.change : null
+    pendingFocus = null
+    return { change: fresh }
+  })
   orca.commands.register('openspec.openBoard', async () => (await openBoard()).message)
 
   /** The focused local workspace's OpenSpec data root, or an error the board can show. */
