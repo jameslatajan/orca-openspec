@@ -36,7 +36,7 @@ An [Orca](https://github.com/stablyai/orca) plugin for [OpenSpec](https://github
 
 | | Version |
 | --- | --- |
-| This plugin | 1.1.1 |
+| This plugin | 1.1.2 |
 | OpenSpec CLI (tested) | 2.1.0 |
 | Orca (minimum) | 1.4.259 |
 
