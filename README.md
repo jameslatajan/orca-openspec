@@ -2,6 +2,26 @@
 
 An [Orca](https://github.com/stablyai/orca) plugin for [OpenSpec](https://github.com/Fission-AI/OpenSpec). It adds a sidebar panel that shows your workspace's OpenSpec changes and specs, and starts agents for each workflow step.
 
+![OpenSpec for Orca: the sidebar panel listing changes with their status and task progress](assets/cover.png)
+
+## Screenshots
+
+**A Kanban board for your OpenSpec changes**
+
+![The OpenSpec board tab with changes in Planning, Not started, In progress, Ready to archive and Archived columns, each card showing a summary, progress and date](assets/screenshot-board.png)
+
+**Read every proposal and spec**
+
+![A change opened on the board, with file tabs for proposal, design, tasks and a spec delta, the rendered spec scenarios, and related changes](assets/screenshot-detail.png)
+
+**Everything at a glance in the sidebar**
+
+![The OpenSpec sidebar panel with five changes, their status and progress bars](assets/screenshot-panel.png)
+
+**Shared stores, filtered to your system**
+
+![The panel linked to a shared store, filtered to the shop system with a Shared section, and the Store settings card](assets/screenshot-stores.png)
+
 ## Features
 
 - **Changes tab:** every active change in `openspec/changes/` as a compact row with a status (Planning, Not started, In progress, Ready to archive), a progress bar and the checked/total task count from its `tasks.md`. Filter by name, and narrow by status (All / In progress / Done) with the dropdown next to the filter box.
